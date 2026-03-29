@@ -913,17 +913,18 @@ async function autoRefreshIfNeeded(){
 }
 // Finnhub free API — works from browser, no CORS issues, 60 calls/min free
 // Sign up free at finnhub.io to get your own key if needed
-const FINNHUB_KEY = "d0ej9q9r01qp2jn2k5r0d0ej9q9r01qp2jn2k5rg"; // free demo key
+const FINNHUB_KEY = "d74pkqhr01qg1eo6drtgd74pkqhr01qg1eo6dru0";
 
 async function fetchPriceFinnhub(ticker){
   const sym = String(ticker||"").trim().toUpperCase();
   if(!sym) return null;
   try{
+    // Use token as query param only — no headers (avoids CORS preflight on Finnhub)
     const url = `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(sym)}&token=${FINNHUB_KEY}`;
-    const res = await fetch(url, {method:"GET", cache:"no-store"});
+    const res = await fetch(url);
     if(!res.ok) return null;
     const data = await res.json();
-    // Finnhub returns {c: current, o: open, h: high, l: low, pc: prev close}
+    // Finnhub returns {c: current price, pc: prev close, o: open, h: high, l: low}
     const price = data?.c;
     if(typeof price === "number" && price > 0) return price;
     return null;
@@ -997,8 +998,8 @@ function renderRobinhood(){
       <div class="sub" style="margin-bottom:8px">Prices update via Refresh button only. All other values auto-calculate from your trades.</div>
       <table>
         <thead><tr>
-          <th>Ticker</th><th>Shares</th><th>Avg Cost</th>
-          <th>Price ${tip("Tap to edit manually · or use Refresh Prices button")}</th>
+          <th>Ticker</th><th>Shares</th><th>Avg Cost ${tip("Edit via Trades tab")}</th>
+          <th>Price ${tip("Updates via Refresh Prices button using Finnhub")}</th>
           <th>Value</th><th>G/L $</th><th>G/L %</th>
         </tr></thead>
         <tbody>
@@ -1006,7 +1007,7 @@ function renderRobinhood(){
           <td class="ticker">${h.ticker}</td>
           <td class="mono">${h.shares.toFixed(4)}</td>
           <td class="money">${fmt(h.avg)}</td>
-          <td><button class="btn ghost" style="font-family:'DM Mono',monospace" data-openprice="${h.id}">${fmt(h.current_price)}</button></td>
+          <td class="money" style="font-family:'DM Mono',monospace">${h.current_price>0?fmt(h.current_price):'—'}</td>
           <td class="money">${fmt(h.value)}</td>
           <td class="${h.gl>=0?'gain':'loss'} money">${h.gl>=0?'+':''}${fmt(h.gl)}</td>
           <td class="${h.gl>=0?'gain':'loss'}">${h.gl>=0?'+':''}${pct(h.glPct,2)}</td>
@@ -1453,7 +1454,7 @@ function wire(){
     openModal("editHsaEntryModal");
   });
   document.querySelectorAll("[data-expand]").forEach(r=>r.onclick=()=>document.getElementById(`trades-${r.dataset.expand}`).classList.toggle("hidden"));
-  document.querySelectorAll("[data-openprice]").forEach(b=>b.onclick=(e)=>{ e.stopPropagation(); const h=S.robinhood.holdings.find(x=>x.id==b.dataset.openprice); if(!h) return; document.getElementById("priceTicker").value=h.ticker; document.getElementById("priceVal").value=h.current_price; openModal("priceModal"); });
+  // Price editing removed — prices come from Finnhub refresh only
   document.querySelectorAll("[data-delhold]").forEach(b=>b.onclick=()=>{ if(confirm("Delete entire position and all its trades?")) { S.robinhood.holdings=S.robinhood.holdings.filter(h=>h.id!=b.dataset.delhold); saveState(); }});
 
   // Edit trade
