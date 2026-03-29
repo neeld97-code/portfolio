@@ -1,0 +1,1534 @@
+<!--
+/* NEEL'S PORTFOLIO TRACKER v1.0
+Single-file static app. Drag index.html to netlify.com/drop to deploy.
+Data lives in browser localStorage. Export JSON from Settings regularly.
+To update: edit in Cursor, re-drag to Netlify. Same URL, instant update. */
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+  <title>Neel Portfolio Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <style>
+    :root{
+      --bg:#0b1020; --panel:#121a2c; --panel-2:#18223a; --text:#e5e7eb; --muted:#9ca3af; --border:#25314d;
+      --accent:#6366f1; --gain:#22c55e; --loss:#ef4444; --gold:#f59e0b; --blue:#3b82f6; --purple:#8b5cf6; --gray:#6b7280;
+      --shadow:0 8px 24px rgba(0,0,0,.28);
+      --grid:rgba(148,163,184,.22);
+    }
+    [data-theme="light"]{
+      --bg:#f5f7fb; --panel:#ffffff; --panel-2:#f5f7fb; --text:#0f172a; --muted:#475569; --border:#e2e8f0;
+      --shadow:0 8px 24px rgba(15,23,42,.08); --grid:rgba(71,85,105,.22);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:"DM Sans",system-ui,-apple-system,sans-serif}
+    .mono,.money,.ticker{font-family:"DM Mono",monospace}
+    .app{display:flex;min-height:100vh}
+    .sidebar{position:fixed;left:0;top:0;bottom:0;width:230px;background:var(--panel);border-right:1px solid var(--border);padding:16px;display:none}
+    .brand{font-weight:700;margin-bottom:16px}
+    .nav-btn{width:100%;display:flex;gap:10px;align-items:center;padding:11px 12px;background:transparent;border:1px solid transparent;color:var(--text);border-radius:12px;cursor:pointer}
+    .nav-btn.active{background:var(--panel-2);border-color:var(--border)}
+    .main{flex:1;display:flex;flex-direction:column;min-height:100vh}
+    .header{position:sticky;top:0;z-index:5;background:color-mix(in srgb, var(--bg) 92%, transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:12px 14px;display:flex;justify-content:space-between;align-items:center}
+    .content{padding:14px 14px 88px}
+    .section{display:grid;gap:12px}
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:14px;box-shadow:var(--shadow)}
+    .card.soft{background:color-mix(in srgb, var(--accent) 12%, var(--panel))}
+    .card.warn{background:color-mix(in srgb, var(--loss) 12%, var(--panel));border-color:color-mix(in srgb, var(--loss) 40%, var(--border))}
+    .card.gold{background:color-mix(in srgb, var(--gold) 15%, var(--panel))}
+    .metric-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .metric h4{margin:0 0 6px;font-size:12px;color:var(--muted);font-weight:500;display:flex;gap:6px;align-items:center}
+    .metric .v{font-size:22px;font-weight:700}
+    .sub{font-size:12px;color:var(--muted)}
+    .gain{color:var(--gain)} .loss{color:var(--loss)} .gold{color:var(--gold)}
+    .row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+    .btn{background:var(--accent);border:none;color:white;padding:10px 12px;border-radius:12px;cursor:pointer;font-weight:600;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+    .btn.ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+    .btn.good{background:var(--gain)} .btn.gray{background:#6b7280}
+    .toggle{width:46px;height:26px;border-radius:999px;background:#334155;position:relative;cursor:pointer;border:1px solid var(--border);-webkit-tap-highlight-color:transparent;touch-action:manipulation;user-select:none}
+    .toggle i{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:white;transition:.2s;pointer-events:none}
+    .toggle.on{background:var(--accent)} .toggle.on i{left:23px}
+    .toggle:active{opacity:.92}
+    .bottom-nav{position:fixed;left:0;right:0;bottom:0;background:var(--panel);border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(7,1fr);z-index:8}
+    .bottom-nav button{border:0;background:transparent;color:var(--muted);padding:8px 2px;font-size:11px;cursor:pointer}
+    .bottom-nav button.active{color:var(--text)}
+    .bottom-nav .ico{display:block;font-size:18px}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th,td{border-bottom:1px solid var(--border);padding:8px 6px;text-align:left}
+    th{color:var(--muted);font-weight:500}
+    .pill{font-size:12px;padding:3px 8px;border-radius:999px;background:var(--panel-2);border:1px solid var(--border)}
+    .bar{height:10px;background:var(--panel-2);border-radius:999px;overflow:hidden;border:1px solid var(--border)}
+    .bar > i{display:block;height:100%;background:var(--accent)}
+    .charts{height:250px}
+    .tabsplit{display:grid;gap:12px}
+    .tooltip{display:inline-flex;width:17px;height:17px;border-radius:999px;border:1px solid var(--border);align-items:center;justify-content:center;font-size:11px;color:var(--muted);position:relative;cursor:help}
+    .tooltip span{display:none;position:absolute;bottom:120%;right:0;width:220px;background:var(--panel-2);border:1px solid var(--border);padding:8px;border-radius:10px;color:var(--text);font-size:11px;z-index:9}
+    .tooltip:hover span{display:block}
+    .click{cursor:pointer}
+    .modal-wrap{position:fixed;inset:0;background:rgba(2,6,23,.55);backdrop-filter:blur(5px);display:none;align-items:flex-end;justify-content:center;z-index:20}
+    .modal-wrap.show{display:flex}
+    .modal{width:min(560px,100%);background:var(--panel);border:1px solid var(--border);border-radius:20px 20px 0 0;padding:14px;max-height:85vh;overflow:auto}
+    .modal h3{margin:0 0 10px}
+    .f{display:grid;gap:10px}
+    label{font-size:12px;color:var(--muted)}
+    input,select,textarea{width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:9px;font-family:inherit}
+    .two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--border);padding:8px 12px;border-radius:10px;z-index:30;max-width:92vw;text-align:center}
+    .rh-spin{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:rhspin .65s linear infinite;vertical-align:-2px;margin-right:8px}
+    @keyframes rhspin{to{transform:rotate(360deg)}}
+    button:disabled{opacity:.65;cursor:not-allowed}
+    .hidden{display:none!important}
+    .factors .frow{display:grid;grid-template-columns:120px 1fr 46px;align-items:center;gap:8px;margin:6px 0}
+    .account-cards{display:grid;grid-template-columns:1fr;gap:8px}
+    .gl-both{font-size:13px;font-weight:600;margin-top:4px}
+    @media(min-width:900px){
+      .sidebar{display:block}
+      .main{margin-left:230px}
+      .bottom-nav{display:none}
+      .content{padding:18px}
+      .metric-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+      .tabsplit.two-col{grid-template-columns:1.1fr .9fr}
+      .modal{border-radius:18px;align-self:center}
+      .account-cards{grid-template-columns:repeat(3,1fr)}
+      .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    }
+  </style>
+</head>
+<body data-theme="dark">
+<div class="app">
+  <aside class="sidebar" id="desktopNav"></aside>
+  <main class="main">
+    <header class="header">
+      <div id="title"></div>
+      <div class="row">
+        <span class="sub">Light mode</span>
+        <div class="toggle" id="themeToggle" role="button" tabindex="0" aria-label="Toggle light or dark theme"><i></i></div>
+      </div>
+    </header>
+    <section class="content" id="content"></section>
+  </main>
+</div>
+<nav class="bottom-nav" id="mobileNav"></nav>
+<input id="jsonImportInput" type="file" accept="application/json" class="hidden" />
+<div id="toastHost"></div>
+<div id="modalHost"></div>
+
+<script>
+const LS_KEY = "neel_portfolio_v1";
+let S = null;
+let TAB = "Portfolio";
+const CHARTS = {};
+const TABS = ["Portfolio","401k","HSA","Robinhood","Debt","Future","Settings"];
+const EMOJI = {Portfolio:"\ud83d\udcc8","401k":"\ud83c\udfe6",HSA:"\ud83e\ude7a",Robinhood:"\ud83d\udcb5",Debt:"\ud83e\uddfe",Future:"\ud83d\udd2e",Settings:"\u2699\ufe0f"};
+let robinhoodPriceRefreshLoading=false;
+let iosStandaloneTapInit=false;
+
+function salaryForDateFromHistory(dateStr, history, fallbackSalary){
+  const hist=[...(history||[])].filter(h=>h!=null&&String(h.date||"").length>=8).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  if(!hist.length) return Number(fallbackSalary)||0;
+  let sal=Number(hist[0].salary);
+  const d=String(dateStr);
+  for(const h of hist){ if(String(h.date)<=d) sal=Number(h.salary); }
+  return sal;
+}
+
+function seedState(){
+  const settings={
+      theme:"dark",salary:85000,salary_date:"2026-04-01",
+      salary_history:[{salary:81000,date:"2025-07-01"},{salary:85000,date:"2026-04-01"}],
+      k401_pct:6,employer_match_pct:3.5,hsa_per_paycheck:158,hsa_employer_annual:608,goal:250000,show_debt:false,
+      hsa_years:[{year:2025,self_annual:3700,employer_annual:300},{year:2026,self_annual:3792,employer_annual:600}],
+      hsa_years:[
+        {year:2025,self_annual:3700,employer_annual:300},
+        {year:2026,self_annual:3792,employer_annual:600}
+      ],
+      proj:{portfolio:50142,monthly:2957,return_pct:10,inflation:3,contrib_growth:3,retire_age:65}
+  };
+  return {
+    profile:{name:"Neel Deshmukh"},
+    settings,
+    k401:{
+      current_value:6709.55,
+      allocation:{sp500:60,ext:20,acwi:20},
+      contributions:[
+        {id:1, date:"2025-07-15",you:202.50,cmi:118.13,note:"",locked:true,salary_used:81000},
+        {id:2, date:"2025-07-31",you:202.50,cmi:118.13,note:"",locked:true,salary_used:81000},
+        {id:3, date:"2025-08-15",you:202.50,cmi:118.13,note:"",locked:true,salary_used:81000},
+        {id:4, date:"2025-08-29",you:202.50,cmi:118.13,note:"",locked:true,salary_used:81000},
+        {id:5, date:"2025-09-15",you:202.50,cmi:118.13,note:"",locked:true,salary_used:81000},
+        {id:6, date:"2025-09-30",you:202.50,cmi:118.13,note:"",locked:true,salary_used:81000},
+        {id:7, date:"2025-10-15",you:202.50,cmi:118.13,note:"",locked:true,salary_used:81000},
+        {id:8, date:"2025-10-31",you:202.50,cmi:118.13,note:"",locked:true,salary_used:81000},
+        {id:9, date:"2025-11-14",you:202.50,cmi:118.13,note:"",locked:true,salary_used:81000},
+        {id:10,date:"2025-11-28",you:202.50,cmi:118.13,note:"",locked:true,salary_used:81000},
+        {id:11,date:"2025-12-15",you:202.50,cmi:118.13,note:"",locked:true,salary_used:81000},
+        {id:12,date:"2025-12-31",you:202.50,cmi:118.13,note:"",locked:true,salary_used:81000},
+        {id:13,date:"2026-01-15",you:202.50,cmi:118.13,note:"",locked:true,salary_used:81000},
+        {id:14,date:"2026-01-30",you:202.50,cmi:118.13,note:"",locked:true,salary_used:81000},
+        {id:15,date:"2026-02-13",you:202.50,cmi:118.13,note:"",locked:true,salary_used:81000},
+        {id:16,date:"2026-02-27",you:202.50,cmi:118.13,note:"",locked:true,salary_used:81000},
+        {id:17,date:"2026-03-13",you:202.50,cmi:118.13,note:"",locked:true,salary_used:81000},
+        {id:18,date:"2026-03-31",you:202.50,cmi:118.13,note:"",locked:true,salary_used:81000}
+      ]
+    },
+    hsa:{
+      hsa_cash:262.69,
+      schwab_value:4810.23,
+      schwab_history:[{date:"2025-12-31",value:4000},{date:"2026-03-15",value:4810.23}],
+      contributions:[
+        {id:1,date:"2025-12-31",amount:3700,type:"self",note:"2025 self contributions (annual)",locked:true},
+        {id:2,date:"2025-12-31",amount:300,type:"employer",note:"2025 employer contribution (annual)",locked:true},
+        {id:3,date:"2026-01-15",amount:600,type:"employer",note:"2026 employer contribution",locked:true},
+        {id:4,date:"2026-01-15",amount:158,type:"self",note:"Jan paycheck 1",locked:true},
+        {id:5,date:"2026-02-03",amount:158,type:"self",note:"Feb paycheck 1",locked:true},
+        {id:6,date:"2026-02-18",amount:158,type:"self",note:"Feb paycheck 2",locked:true},
+        {id:7,date:"2026-03-03",amount:158,type:"self",note:"Mar paycheck 1",locked:true},
+        {id:8,date:"2026-03-18",amount:158,type:"self",note:"Mar paycheck 2",locked:true}
+      ]
+    },
+    robinhood:{
+      cash:10449.08,
+      holdings:[
+        {id:1,ticker:"VGT",name:"Vanguard IT ETF",trades:[{date:"2025-07-15",amount:9240.77,qty:13.14,price:703.25}],current_price:696.04},
+        {id:2,ticker:"QQQ",name:"Invesco QQQ",trades:[{date:"2025-07-15",amount:7689.08,qty:13.44,price:572.10}],current_price:573.79},
+        {id:3,ticker:"SPMO",name:"S&P 500 Momentum",trades:[{date:"2025-08-01",amount:4358.15,qty:37.10,price:117.47}],current_price:111.34},
+        {id:4,ticker:"IAU",name:"iShares Gold Trust",trades:[{date:"2025-09-01",amount:8391.54,qty:102.03,price:82.25}],current_price:49.05},
+        {id:5,ticker:"GDLC",name:"Grayscale Digital",trades:[{date:"2025-10-01",amount:1015.58,qty:22.77,price:44.60}],current_price:32.25},
+        {id:6,ticker:"CMI",name:"Cummins Inc.",trades:[{date:"2025-07-15",amount:3796.89,qty:7.09,price:535.30}],current_price:535.37},
+        {id:7,ticker:"IBIT",name:"iShares Bitcoin ETF",trades:[{date:"2025-11-01",amount:1265.45,qty:19.23,price:65.81}],current_price:39.62},
+        {id:8,ticker:"AVUV",name:"Avantis US Small Cap Val",trades:[{date:"2026-01-01",amount:200,qty:2.44,price:82}],current_price:82.09}
+      ]
+    },
+    debt:{
+      car:{name:"Car Loan",institution:"Money FCU, Syracuse",balance:14098.37,original_balance:15760,rate:5.24,payment:326.29,payment_day:10,months_remaining:43},
+      student:{name:"Student Loan",institution:"SoFi",balance:73474.04,accrued_interest:173.11,rate:6.615,payment:600,avg_payment:565,payment_day:14,months_remaining:237,total_months:240},
+      payment_history:[
+        {date:"2026-03-14",loan:"student",amount:600,principal:196,interest:404,balance_after:73474.04},
+        {date:"2026-03-10",loan:"car",amount:326.29,principal:264,interest:62.29,balance_after:14098.37},
+        {date:"2026-02-14",loan:"student",amount:600,principal:195,interest:405,balance_after:73670.04},
+        {date:"2026-02-10",loan:"car",amount:326.29,principal:263,interest:63.29,balance_after:14424.66}
+      ]
+    },
+    snapshots:[{date:"2025-12-31",value:40000},{date:"2026-03-27",value:50142.93}]
+  };
+}
+
+function reconcile401kRowsFromHistory(){
+  const pct=S.settings.k401_pct/100, em=S.settings.employer_match_pct/100;
+  for(const r of S.k401.contributions){
+    if(r.opening) continue;
+    const salTrue=salaryForDateFromHistory(r.date,S.settings.salary_history,S.settings.salary);
+    const su=Number(r.salary_used||0);
+    const youFromSu=+(su*pct/24).toFixed(2), cmiFromSu=+(su*em/24).toFixed(2);
+    const matchesStoredSalary=Math.abs(Number(r.you)-youFromSu)<0.02&&Math.abs(Number(r.cmi)-cmiFromSu)<0.02;
+    if(matchesStoredSalary&&su!==salTrue){
+      r.salary_used=salTrue;
+      r.you=+(salTrue*pct/24).toFixed(2);
+      r.cmi=+(salTrue*em/24).toFixed(2);
+    }
+  }
+}
+
+function loadState(){
+  try{ S=JSON.parse(localStorage.getItem(LS_KEY))||seedState(); }catch(_){ S=seedState(); }
+  // Migrate: ensure hsa_cash and hsa_years exist
+  if(S&&S.hsa){
+    if(typeof S.hsa.hsa_cash==="undefined") S.hsa.hsa_cash=0;
+    delete S.hsa.hsa_balance;
+    delete S.hsa.hsa_limit;
+  }
+  if(S&&S.settings){
+    if(!Array.isArray(S.settings.hsa_years)){
+      S.settings.hsa_years=[
+        {year:2025,self_annual:3700,employer_annual:300},
+        {year:2026,self_annual:3792,employer_annual:600}
+      ];
+    }
+  }
+  // Migrate: remove any 401k entries that were confirmed on the 1st of a month
+  // (old logic used 1st+15th, new logic uses 15th+last weekday of month)
+  if(S&&S.k401&&Array.isArray(S.k401.contributions)){
+    const before=S.k401.contributions.length;
+    S.k401.contributions=S.k401.contributions.filter(r=>{
+      // Remove entries auto-generated on the 1st of any month (old incorrect logic)
+      const day=String(r.date||"").slice(8,10);
+      if(day==="01") return false;
+      // Remove the old single opening/cumulative entry
+      if(r.opening===true) return false;
+      return true;
+    });
+    if(S.k401.contributions.length!==before){
+      console.log("Migrated: removed "+(before-S.k401.contributions.length)+" old 1st-of-month 401k entries");
+    }
+  }
+  if(S&&S.k401&&Array.isArray(S.k401.contributions)) reconcile401kRowsFromHistory();
+  saveState(false);
+}
+function saveState(render=true){ localStorage.setItem(LS_KEY, JSON.stringify(S)); if(render) doRender(); }
+function fmt(n,dec=2){ return new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:dec,minimumFractionDigits:dec}).format(Number(n||0)); }
+function pct(n,dec=1){ return `${Number(n||0).toFixed(dec)}%`; }
+function glStr(gl,glPct){ const cls=gl>=0?"gain":"loss"; const sign=gl>=0?"+":""; return `<span class="${cls}">${sign}${fmt(gl)} · ${sign}${pct(glPct)}</span>`; }
+function toast(msg){ const t=document.createElement("div"); t.className="toast"; t.textContent=msg; document.getElementById("toastHost").appendChild(t); setTimeout(()=>t.remove(),1900); }
+function sum(arr,f){ return arr.reduce((a,b)=>a+(f?f(b):b),0); }
+function d(v){ return new Date(v+"T12:00:00"); }
+function today(){ return new Date(); }
+function qEndInfo(date){
+  const y=date.getFullYear(); const m=date.getMonth()+1; const day=date.getDate();
+  if(m===3 && day>=25) return {q:1,end:`${y}-03-31`};
+  if(m===6 && day>=24) return {q:2,end:`${y}-06-30`};
+  if(m===9 && day>=24) return {q:3,end:`${y}-09-30`};
+  if(m===12 && day>=25) return {q:4,end:`${y}-12-31`};
+  return null;
+}
+function hasSnapshotInQuarter(y,q){
+  const rng=[[1,3],[4,6],[7,9],[10,12]][q-1];
+  return S.snapshots.some(s=>{ const dt=new Date(s.date+"T12:00:00"); return dt.getFullYear()===y && (dt.getMonth()+1)>=rng[0] && (dt.getMonth()+1)<=rng[1]; });
+}
+
+// Financial calculations
+function computeHolding(h){
+  const shares = sum(h.trades,t=>Number(t.qty));
+  const cost = sum(h.trades,t=>Number(t.amount));
+  const avg = shares ? cost/shares : 0;
+  const value = shares * Number(h.current_price||0);
+  const gl = value - cost;
+  const glPct = cost ? (gl/cost)*100 : 0;
+  return {...h,shares,cost,avg,value,gl,glPct};
+}
+function computeRobinhood(){
+  const hs = S.robinhood.holdings.map(computeHolding);
+  const invested = sum(hs,h=>h.cost);
+  const value = sum(hs,h=>h.value);
+  const gl = value - invested;
+  const glPct=invested ? (gl/invested)*100 : 0;
+  const worst = hs.map(h=>({ticker:h.ticker,p:(value? (h.value/value)*100:0)})).sort((a,b)=>b.p-a.p)[0];
+  return {holdings:hs,invested,value,gl,glPct,count:hs.length,cash:Number(S.robinhood.cash||0),worst};
+}
+function compute401k(){
+  const rows=[...S.k401.contributions].sort((a,b)=>d(a.date)-d(b.date));
+  const you = sum(rows,r=>Number(r.you));
+  const cmi = sum(rows,r=>Number(r.cmi));
+  const invested = you+cmi;
+  const value = Number(S.k401.current_value||0);
+  const gl = value-invested;
+  const glPct = invested ? (gl/invested)*100 : 0;
+  // Match P/L: how much account value exceeds YOUR money only
+  const contribGl = value-you;
+  const contribGlPct = you ? (contribGl/you)*100 : 0;
+  // Group by year
+  const byYear={};
+  rows.forEach(r=>{
+    const yr=String(r.date||"").slice(0,4)||"Unknown";
+    if(!byYear[yr]) byYear[yr]={year:yr,you:0,cmi:0};
+    byYear[yr].you+=Number(r.you||0);
+    byYear[yr].cmi+=Number(r.cmi||0);
+  });
+  const years=Object.values(byYear).sort((a,b)=>b.year.localeCompare(a.year));
+  return {rows,you,cmi,invested,value,gl,glPct,contribGl,contribGlPct,years};
+}
+function computeHSA(){
+  const rows=[...S.hsa.contributions];
+  // HSA invested = auto sum of ALL contributions
+  const you = sum(rows.filter(r=>r.type==="self"),r=>Number(r.amount));
+  const employer = sum(rows.filter(r=>r.type==="employer"),r=>Number(r.amount));
+  const invested = you + employer;
+  // HSA total account value = HSA cash account + Charles Schwab brokerage
+  const hsaCash = Number(S.hsa.hsa_cash||0);
+  const schwabValue = Number(S.hsa.schwab_value||0);
+  const totalValue = hsaCash + schwabValue;
+  // P/L row 1: total account value vs all money invested
+  const gl = totalValue - invested;
+  const glPct = invested ? (gl/invested)*100 : 0;
+  // P/L row 2: total account value vs YOUR money only (excludes employer)
+  const contribGl = totalValue - you;
+  const contribGlPct = you ? (contribGl/you)*100 : 0;
+  // Group by year for yearly table
+  const byYear={};
+  rows.forEach(r=>{
+    const yr=String(r.date||"").slice(0,4)||"Unknown";
+    if(!byYear[yr]) byYear[yr]={year:yr,self:0,employer:0};
+    if(r.type==="self") byYear[yr].self+=Number(r.amount||0);
+    else byYear[yr].employer+=Number(r.amount||0);
+  });
+  const years=Object.values(byYear).sort((a,b)=>b.year.localeCompare(a.year));
+  return {rows,you,employer,invested,totalValue,hsaCash,schwabValue,gl,glPct,contribGl,contribGlPct,years};
+}
+
+function studentTotalOwed(s){ return Number(s.balance)+Number(s.accrued_interest||0); }
+
+function amortOneMonth(balance, annualRatePct, payment){
+  const b=Math.max(0,Number(balance));
+  const r=Number(annualRatePct)/100/12;
+  const interest=b*r;
+  const principal=payment-interest;
+  const newBalance=b-principal;
+  return {interest,principal,newBalance};
+}
+
+function simulateLoanPayoff(startBalance, annualRatePct, payment, maxMonths=12000){
+  let b=Math.max(0,Number(startBalance));
+  let months=0, totalInterestRemaining=0;
+  while(b>0.015&&months<maxMonths){
+    const {interest,principal,newBalance}=amortOneMonth(b,annualRatePct,payment);
+    totalInterestRemaining+=interest;
+    b=newBalance;
+    months++;
+  }
+  return {months,totalInterestRemaining,balanceLeft:b,hopeless:b>0.015};
+}
+
+function interestOverNextNPayments(startBalance, annualRatePct, payment, n){
+  let b=Math.max(0,Number(startBalance));
+  let s=0;
+  for(let i=0;i<n;i++){
+    if(b<=0.005) break;
+    const {interest,newBalance}=amortOneMonth(b,annualRatePct,payment);
+    s+=interest;
+    b=newBalance;
+  }
+  return s;
+}
+
+function payoffEtaLabel(monthsFromNow, hopeless){
+  if(hopeless||!Number.isFinite(monthsFromNow)||monthsFromNow>8000) return "—";
+  const dt=new Date();
+  dt.setMonth(dt.getMonth()+Math.ceil(monthsFromNow));
+  return dt.toLocaleString("en-US",{month:"short",year:"numeric"});
+}
+
+function balanceBeforeHistoricalPayment(loanKey, payDateStr){
+  const ref=S.debt[loanKey];
+  const cur=loanKey==="student"?studentTotalOwed(ref):Number(ref.balance);
+  const later=S.debt.payment_history.filter(h=>
+    h.loan===loanKey&&!h.missed&&typeof h.principal==="number"&&h.date&&d(h.date)>d(payDateStr)
+  );
+  return cur+sum(later,h=>Number(h.principal||0));
+}
+
+function splitPaymentOnBalance(balanceBefore, annualRatePct, paymentAmount){
+  const b=Math.max(0,Number(balanceBefore));
+  const r=Number(annualRatePct)/100/12;
+  const interest=+(b*r).toFixed(2);
+  const principal=+(paymentAmount-interest).toFixed(2);
+  let newBal=+(b-principal).toFixed(2);
+  if(newBal<0) newBal=0;
+  return {interest,principal,newBalance:newBal};
+}
+
+function applyStudentPrincipalReduction(ref, principalPortion){
+  let pp=Math.max(0,Number(principalPortion));
+  let acc=Number(ref.accrued_interest||0), pb=Number(ref.balance);
+  const red=Math.min(pp,acc+pb);
+  let rem=red;
+  if(rem>=acc){ ref.accrued_interest=0; ref.balance=Math.max(0,pb-(rem-acc)); }
+  else ref.accrued_interest=acc-rem;
+}
+
+function computeDebt(){
+  const car=S.debt.car, student=S.debt.student;
+  const carBal=Number(car.balance);
+  const stuOwed=studentTotalOwed(student);
+  const total=carBal+stuOwed;
+  const monthly=Number(car.payment)+Number(student.payment);
+  const carSim=simulateLoanPayoff(carBal,car.rate,car.payment);
+  const stuSim=simulateLoanPayoff(stuOwed,student.rate,student.payment);
+  const annualInterest=interestOverNextNPayments(carBal,car.rate,car.payment,12)
+    +interestOverNextNPayments(stuOwed,student.rate,student.payment,12);
+  const nextCar=amortOneMonth(carBal,car.rate,car.payment);
+  const nextStu=amortOneMonth(stuOwed,student.rate,student.payment);
+  return{car,student,total,monthly,annualInterest,longest:Math.max(carSim.months,stuSim.months),carSim,stuSim,nextCar,nextStu,carBal,stuOwed};
+}
+
+function buildPayoffProjectionSeries(){
+  const car=S.debt.car, student=S.debt.student;
+  const carPts=[]; let b=Math.max(0,Number(car.balance));
+  carPts.push(b);
+  for(let guard=0;b>0.015&&guard<15000;guard++){
+    b=amortOneMonth(b,car.rate,car.payment).newBalance;
+    carPts.push(Math.max(0,b));
+  }
+  const stuPts=[]; b=Math.max(0,studentTotalOwed(student));
+  stuPts.push(b);
+  for(let guard=0;b>0.015&&guard<15000;guard++){
+    b=amortOneMonth(b,student.rate,student.payment).newBalance;
+    stuPts.push(Math.max(0,b));
+  }
+  const n=Math.max(carPts.length,stuPts.length);
+  const carData=[], stuData=[];
+  for(let i=0;i<n;i++){
+    carData.push({x:i,y:i<carPts.length?carPts[i]:null});
+    stuData.push({x:i,y:i<stuPts.length?stuPts[i]:null});
+  }
+  let carZeroMonth=null;
+  const zi=carPts.findIndex(v=>v<=0.05);
+  if(zi>=0) carZeroMonth=zi;
+  return{carData,stuData,carZeroMonth,maxMonth:n-1};
+}
+
+function totalPortfolio(){
+  const k=compute401k(), h=computeHSA(), r=computeRobinhood();
+  const invested = k.invested+h.invested+r.invested;
+  const value = k.value+h.totalValue+r.value+r.cash;
+  return {k,h,r,invested,value,gl:value-invested,glPct:invested?(value-invested)/invested*100:0};
+}
+
+function makeChart(id,config){
+  if(CHARTS[id]) CHARTS[id].destroy();
+  const el=document.getElementById(id);
+  if(!el) return;
+  CHARTS[id] = new Chart(el, config);
+}
+function chartOpts(){
+  const css = getComputedStyle(document.body);
+  return {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:css.getPropertyValue("--text").trim()}}},
+    scales:{x:{ticks:{color:css.getPropertyValue("--muted").trim()},grid:{color:css.getPropertyValue("--grid").trim()}},
+      y:{ticks:{color:css.getPropertyValue("--muted").trim()},grid:{color:css.getPropertyValue("--grid").trim()}}}
+  };
+}
+
+function navHtml(){
+  const mk=(tab)=>`<button class="${TAB===tab?'active':''}" data-tab="${tab}"><span class="ico">${EMOJI[tab]}</span>${tab}</button>`;
+  document.getElementById("mobileNav").innerHTML=TABS.map(mk).join("");
+  document.getElementById("desktopNav").innerHTML=`<div class="brand">${S.profile.name}</div>${TABS.map(t=>`<button class="nav-btn ${TAB===t?'active':''}" data-tab="${t}">${EMOJI[t]} ${t}</button>`).join("")}`;
+  [...document.querySelectorAll("[data-tab]")].forEach(b=>b.onclick=()=>{TAB=b.dataset.tab; doRender();});
+}
+function switchTheme(){
+  document.body.setAttribute("data-theme",S.settings.theme);
+  const on=S.settings.theme==="light";
+  const t=document.getElementById("themeToggle");
+  if(t) t.classList.toggle("on", on);
+  const t2=document.getElementById("themeToggle2");
+  if(t2) t2.classList.toggle("on", on);
+}
+
+function tip(text){ return `<span class="tooltip">?<span>${text}</span></span>`; }
+
+function renderPortfolio(){
+  const p=totalPortfolio(), debt=computeDebt(), showDebt=S.settings.show_debt;
+  const net = showDebt ? p.value-debt.total : p.value;
+  const gainCls = p.gl>=0?"gain":"loss";
+  const q = qEndInfo(today());
+  const qBanner = q && !hasSnapshotInQuarter(today().getFullYear(), q.q);
+  const goal=S.settings.goal, fill=Math.min(100,(p.value/goal)*100);
+  const monthly=S.settings.proj.monthly, ret=S.settings.proj.return_pct/100/12;
+  let months=0,v=p.value; while(v<goal && months<1200){ v=v*(1+ret)+monthly; months++; }
+  const etaYear = new Date().getFullYear() + Math.floor(months/12);
+  const worst = p.r.worst && p.r.worst.p>30 ? p.r.worst : null;
+  const kGl=p.k.gl, kGlP=p.k.glPct, hGl=p.h.gl, hGlP=p.h.glPct, rGl=p.r.gl, rGlP=p.r.glPct;
+  return `
+    <div class="section">
+      <div class="card row">
+        <div><strong>Include debt in net worth</strong></div>
+        <div class="toggle ${showDebt?'on':''}" id="debtToggle"><i></i></div>
+      </div>
+      ${qBanner?`<div class="card soft row"><div>📸 Q${q.q} ${today().getFullYear()} ends soon — log your portfolio snapshot?</div><button class="btn" data-open="snapshotModal">Log Now</button></div>`:""}
+      ${worst?`<div class="card warn">⚠️ ${worst.ticker} is ${worst.p.toFixed(1)}% of your Robinhood portfolio. Consider rebalancing.</div>`:""}
+      <div class="metric-grid">
+        <div class="card metric"><h4>Invested ${tip("Total amount put in across all accounts — cost basis, not current value")}</h4><div class="v money">${fmt(p.invested)}</div></div>
+        <div class="card metric"><h4>Portfolio Value</h4><div class="v money">${fmt(p.value)}</div></div>
+        <div class="card metric"><h4>Gain/Loss</h4><div class="v money ${gainCls}">${fmt(p.gl)}</div><div class="sub ${gainCls}">${p.glPct>=0?"+":""}${pct(p.glPct)}</div></div>
+        <div class="card metric"><h4>Net Worth ${tip("Toggle above to include or exclude debt from this figure")}</h4><div class="v money ${net>=0?'gain':'loss'}">${fmt(net)}</div><div class="sub">${showDebt?"Includes debt":""}</div></div>
+      </div>
+      <div class="card">
+        <div class="row"><strong>Goal: ${fmt(goal,0)}</strong><span class="sub">${fill.toFixed(1)}%</span></div>
+        <div class="bar" style="margin:10px 0"><i style="width:${fill}%"></i></div>
+        <div class="sub">${fmt(Math.max(0,goal-p.value),0)} remaining · ETA ${etaYear} (10% return assumption)</div>
+      </div>
+      <div class="tabsplit two-col">
+        <div class="card"><div class="charts"><canvas id="portfolioDonut"></canvas></div></div>
+        <div class="card">
+          <div class="row"><strong>Net Worth Snapshots</strong><button class="btn" data-open="snapshotModal">Log Snapshot</button></div>
+          <div class="charts"><canvas id="nwLine"></canvas></div>
+        </div>
+      </div>
+      <div class="account-cards">
+        <div class="card click" data-nav="401k">
+          <strong>401k</strong>
+          <div class="money" style="font-size:20px;margin:4px 0">${fmt(p.k.value)}</div>
+          <div class="gl-both">${glStr(kGl,kGlP)}</div>
+        </div>
+        <div class="card click" data-nav="HSA">
+          <strong>HSA</strong>
+          <div class="money" style="font-size:20px;margin:4px 0">${fmt(p.h.totalValue)}</div>
+          <div class="gl-both">${glStr(hGl,hGlP)}</div>
+        </div>
+        <div class="card click" data-nav="Robinhood">
+          <strong>Robinhood</strong>
+          <div class="money" style="font-size:20px;margin:4px 0">${fmt(p.r.value)}</div>
+          <div class="gl-both">${glStr(rGl,rGlP)}</div>
+        </div>
+      </div>
+      <div class="card gold">💰 <strong class="gold">${fmt(S.robinhood.cash)}</strong> · Robinhood Gold · 3.25% APY · Deploy at S&P 500 -20% correction</div>
+      ${showDebt?`<div class="card warn click" data-nav="Debt"><strong>Total debt ${fmt(debt.total)}</strong><div class="sub">Car ${pct(debt.car.rate,2)} · Student ${pct(debt.student.rate,3)} · Next: ${debt.car.payment_day}th / ${debt.student.payment_day}th</div></div>`:""}
+    </div>
+  `;
+}
+
+function pending401k(){
+  const now=today(), y=now.getFullYear(), mo=now.getMonth()+1;
+  // Paycheck 1: 15th or previous weekday
+  const raw15=`${y}-${String(mo).padStart(2,"0")}-15`;
+  const pay1=prevWeekday(raw15);
+  // Paycheck 2: last day of month or previous weekday
+  const pay2=prevWeekday(lastDayOfMonth(y,mo));
+  const dates=[pay1,pay2].filter(x=>d(x)<=now);
+  const p=S.settings.k401_pct/100, em=S.settings.employer_match_pct/100;
+  return dates.filter(dt=>!S.k401.contributions.some(r=>r.date===dt)).map(dt=>{
+    const salary=getSalaryForDate(dt);
+    return {date:dt,you:+(salary*p/24).toFixed(2),cmi:+(salary*em/24).toFixed(2),salary_used:salary};
+  });
+}
+function getSalaryForDate(dateStr){
+  return salaryForDateFromHistory(dateStr,S.settings.salary_history,S.settings.salary);
+}
+
+function render401k(){
+  const c=compute401k();
+  const pend=pending401k();
+  const annual=S.settings.salary*(S.settings.k401_pct+S.settings.employer_match_pct)/100;
+  const glCls=c.gl>=0?"gain":"loss";
+  const cGlCls=c.contribGl>=0?"gain":"loss";
+  // Build running totals oldest→newest
+  let running=0;
+  const rowsWithRunning=[...c.rows].map(r=>{ running+=Number(r.you)+Number(r.cmi); return {...r,run:running}; });
+  return `<div class="section">
+
+    <!-- Main 401k table matching HSA style -->
+    <div class="card" style="padding:0;overflow:hidden">
+      <!-- Row 1 header -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;background:var(--panel-2)">
+        <div style="padding:10px 12px;font-size:11px;font-weight:600;color:var(--muted);border-right:1px solid var(--border)">401k Invested</div>
+        <div style="padding:10px 12px;font-size:11px;font-weight:600;color:var(--muted);border-right:1px solid var(--border)">Account Value</div>
+        <div style="padding:10px 12px;font-size:11px;font-weight:600;color:var(--muted);border-right:1px solid var(--border)">Gain / Loss</div>
+        <div style="padding:10px 12px;font-size:11px;font-weight:600;color:var(--muted)">% Gain / Loss</div>
+      </div>
+      <!-- Row 1 values -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;border-top:1px solid var(--border)">
+        <div style="padding:12px;border-right:1px solid var(--border)">
+          <div class="money" style="font-size:18px;font-weight:700">${fmt(c.invested)}</div>
+          <div class="sub" style="margin-top:3px">Auto · all contributions</div>
+        </div>
+        <div style="padding:12px;border-right:1px solid var(--border)">
+          <div class="money" style="font-size:18px;font-weight:700">${fmt(c.value)}</div>
+          <button class="btn ghost" style="padding:3px 8px;font-size:11px;margin-top:6px" data-open="k401ValueModal">✏️ Update</button>
+        </div>
+        <div style="padding:12px;border-right:1px solid var(--border);background:${c.gl>=0?"color-mix(in srgb, var(--gain) 10%, var(--panel))":"color-mix(in srgb, var(--loss) 10%, var(--panel))"}">
+          <div class="money ${glCls}" style="font-size:18px;font-weight:700">${c.gl>=0?"+":""}${fmt(c.gl)}</div>
+        </div>
+        <div style="padding:12px;background:${c.gl>=0?"color-mix(in srgb, var(--gain) 10%, var(--panel))":"color-mix(in srgb, var(--loss) 10%, var(--panel))"}">
+          <div class="${glCls}" style="font-size:18px;font-weight:700">${c.gl>=0?"+":""}${pct(c.glPct)}</div>
+        </div>
+      </div>
+      <!-- Row 2 header -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;background:var(--panel-2);border-top:1px solid var(--border)">
+        <div style="padding:10px 12px;font-size:11px;font-weight:600;color:var(--muted);border-right:1px solid var(--border)">Your Contributions</div>
+        <div style="padding:10px 12px;font-size:11px;font-weight:600;color:var(--muted);border-right:1px solid var(--border)">CMI Match</div>
+        <div style="padding:10px 12px;font-size:11px;font-weight:600;color:var(--muted);border-right:1px solid var(--border)">Match P/L</div>
+        <div style="padding:10px 12px;font-size:11px;font-weight:600;color:var(--muted)">% P/L</div>
+      </div>
+      <!-- Row 2 values -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;border-top:1px solid var(--border)">
+        <div style="padding:12px;border-right:1px solid var(--border)">
+          <div class="money" style="font-size:18px;font-weight:700">${fmt(c.you)}</div>
+        </div>
+        <div style="padding:12px;border-right:1px solid var(--border)">
+          <div class="money gain" style="font-size:18px;font-weight:700">${fmt(c.cmi)}</div>
+        </div>
+        <div style="padding:12px;border-right:1px solid var(--border);background:${c.contribGl>=0?"color-mix(in srgb, var(--gain) 10%, var(--panel))":"color-mix(in srgb, var(--loss) 10%, var(--panel))"}">
+          <div class="money ${cGlCls}" style="font-size:18px;font-weight:700">${c.contribGl>=0?"+":""}${fmt(c.contribGl)}</div>
+          <div class="sub" style="margin-top:3px">Value vs your $ only</div>
+        </div>
+        <div style="padding:12px;background:${c.contribGl>=0?"color-mix(in srgb, var(--gain) 10%, var(--panel))":"color-mix(in srgb, var(--loss) 10%, var(--panel))"}">
+          <div class="${cGlCls}" style="font-size:18px;font-weight:700">${c.contribGl>=0?"+":""}${pct(c.contribGlPct)}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Projected annual -->
+    <div class="card">
+      <div class="sub">Projected annual contribution at current salary</div>
+      <div class="money" style="font-size:18px;font-weight:700;margin-top:4px">${fmt(annual,0)}</div>
+      <div class="sub" style="margin-top:2px">You: ${fmt(S.settings.salary*S.settings.k401_pct/100,0)} · CMI: ${fmt(S.settings.salary*S.settings.employer_match_pct/100,0)}</div>
+    </div>
+
+    <!-- Fund allocation -->
+    <div class="card">
+      <strong>Fund Allocation</strong>
+      ${[
+        ["NTGI S&P 500 Index",S.k401.allocation.sp500,"--blue"],
+        ["Vanguard Extended Market Index",S.k401.allocation.ext,"--accent"],
+        ["NT ACWI ex-US Index",S.k401.allocation.acwi,"--purple"]
+      ].map(x=>`<div style="margin-top:8px"><div class="row"><span>${x[0]}</span><span>${x[1]}% · ${fmt(c.value*x[1]/100)}</span></div><div class="bar"><i style="width:${x[1]}%;background:var(${x[2]})"></i></div></div>`).join("")}
+    </div>
+
+    <!-- Pending -->
+    <div class="card"><div class="row"><strong>Pending contributions</strong></div>
+      ${pend.length?pend.map((p,i)=>`<div class="card" style="margin-top:8px">
+        <div>${p.date} · You ${fmt(p.you)} · CMI ${fmt(p.cmi)} · Total ${fmt(p.you+p.cmi)}</div>
+        <div class="sub" style="margin-top:3px">Salary: ${fmt(p.salary_used,0)}</div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn good" data-confirm401k="${i}">Confirm</button>
+          <button class="btn gray" data-skip401k="${i}">Skip</button>
+        </div>
+      </div>`).join(""):'<div class="sub">No pending entries today.</div>'}
+    </div>
+
+    <!-- History — Edit + Delete, no lock -->
+    <div class="card"><div class="row"><strong>Contribution history</strong><button class="btn" data-open="add401kModal">Add Entry</button></div>
+      <table><thead><tr><th>Date</th><th>You</th><th>CMI</th><th>Running</th><th>Salary</th><th>Note</th><th></th></tr></thead><tbody>
+      ${rowsWithRunning.slice().reverse().map(r=>`<tr>
+        <td>${r.date}</td>
+        <td class="money">${fmt(r.you)}</td>
+        <td class="money gain">${fmt(r.cmi)}</td>
+        <td class="money">${fmt(r.run)}</td>
+        <td class="sub">${fmt(r.salary_used||0,0)}</td>
+        <td class="sub">${r.note||""}</td>
+        <td style="white-space:nowrap">
+          <button class="btn ghost" style="padding:3px 8px;font-size:11px" data-edit401k="${r.id}">Edit</button>
+          <button class="btn ghost" style="padding:3px 8px;font-size:11px;color:var(--loss)" data-del401k="${r.id}">Del</button>
+        </td>
+      </tr>`).join("")}
+      </tbody></table>
+    </div>
+
+    <!-- Yearly breakdown -->
+    <div class="card">
+      <strong>Contributions by Year</strong>
+      <table style="margin-top:8px">
+        <thead><tr><th>Year</th><th>Your $</th><th>CMI $</th><th>Total</th></tr></thead>
+        <tbody>
+        ${c.years.map(y=>`<tr>
+          <td><strong>${y.year}</strong></td>
+          <td class="money">${fmt(y.you)}</td>
+          <td class="money gain">${fmt(y.cmi)}</td>
+          <td class="money">${fmt(y.you+y.cmi)}</td>
+        </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Yearly breakdown -->
+    <div class="card">
+      <strong>Contributions by Year</strong>
+      <table style="margin-top:8px">
+        <thead><tr><th>Year</th><th>Your $</th><th>CMI $</th><th>Total</th></tr></thead>
+        <tbody>
+        ${c.years.map(y=>`<tr>
+          <td><strong>${y.year}</strong></td>
+          <td class="money">${fmt(y.you)}</td>
+          <td class="money gain">${fmt(y.cmi)}</td>
+          <td class="money">${fmt(y.you+y.cmi)}</td>
+        </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Salary history -->
+    <div class="card"><details><summary style="cursor:pointer;font-weight:600">Salary history</summary>
+      <div style="margin-top:8px">${S.settings.salary_history.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(s=>`<div class="sub" style="padding:4px 0;border-bottom:1px solid var(--border)">${s.date}: <span class="money">${fmt(s.salary,0)}</span></div>`).join("")}</div>
+    </details></div>
+  </div>`;
+}
+
+// Return the nearest weekday on or before a given date (roll back Sat→Fri, Sun→Fri)
+function prevWeekday(dateStr){
+  const dt=new Date(dateStr+"T12:00:00");
+  const day=dt.getDay(); // 0=Sun,6=Sat
+  if(day===6) dt.setDate(dt.getDate()-1); // Sat→Fri
+  else if(day===0) dt.setDate(dt.getDate()-2); // Sun→Fri
+  return dt.toISOString().slice(0,10);
+}
+// Last day of a given year/month as YYYY-MM-DD
+function lastDayOfMonth(y,m){
+  return new Date(y, m, 0).toISOString().slice(0,10); // month is 1-based, day=0 gives last day of prior month
+}
+function pendingHsa(){
+  const now=today();
+  const y=now.getFullYear(), mo=now.getMonth()+1;
+  // Paycheck 1: 15th or previous weekday
+  const raw15=`${y}-${String(mo).padStart(2,"0")}-15`;
+  const pay1=prevWeekday(raw15);
+  // Paycheck 2: last day of month or previous weekday
+  const rawLast=lastDayOfMonth(y,mo);
+  const pay2=prevWeekday(rawLast);
+  const dates=[pay1,pay2].filter(x=>d(x)<=now);
+  // Get per-paycheck amount from hsa_years for current year, fall back to setting
+  const curYearCfg=(S.settings.hsa_years||[]).find(y=>y.year===y);
+  const yearCfg=(S.settings.hsa_years||[]).find(yy=>yy.year===now.getFullYear());
+  const perPaycheck=yearCfg ? yearCfg.self_annual/24 : Number(S.settings.hsa_per_paycheck);
+  return dates.filter(dt=>!S.hsa.contributions.some(r=>r.date===dt && r.type==="self"))
+    .map(dt=>({date:dt,amount:+perPaycheck.toFixed(2)}));
+}
+
+function renderHSA(){
+  const c=computeHSA(); const pend=pendingHsa();
+  const glCls=c.gl>=0?"gain":"loss";
+  const cGlCls=c.contribGl>=0?"gain":"loss";
+  return `<div class="section">
+
+    <!-- Main HSA table matching Google Sheet layout -->
+    <div class="card" style="padding:0;overflow:hidden">
+      <!-- Row 1 header -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;background:var(--panel-2)">
+        <div style="padding:10px 12px;font-size:11px;font-weight:600;color:var(--muted);border-right:1px solid var(--border)">HSA Invested</div>
+        <div style="padding:10px 12px;font-size:11px;font-weight:600;color:var(--muted);border-right:1px solid var(--border)">HSA Account Value</div>
+        <div style="padding:10px 12px;font-size:11px;font-weight:600;color:var(--muted);border-right:1px solid var(--border)">HSA Gain/Loss</div>
+        <div style="padding:10px 12px;font-size:11px;font-weight:600;color:var(--muted)">% Gain/Loss</div>
+      </div>
+      <!-- Row 1 values -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;border-top:1px solid var(--border)">
+        <div style="padding:12px;border-right:1px solid var(--border)">
+          <div class="money" style="font-size:18px;font-weight:700">${fmt(c.invested)}</div>
+          <div class="sub" style="margin-top:3px">Auto · all contributions</div>
+        </div>
+        <div style="padding:12px;border-right:1px solid var(--border)">
+          <div class="money" style="font-size:18px;font-weight:700">${fmt(c.totalValue)}</div>
+          <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+            <button type="button" class="btn ghost" style="padding:3px 8px;font-size:11px" data-open="hsaCashModal">HSA: ${fmt(c.hsaCash)}</button>
+            <button type="button" class="btn ghost" style="padding:3px 8px;font-size:11px" data-open="hsaSchwabModal">Schwab: ${fmt(c.schwabValue)}</button>
+          </div>
+        </div>
+        <div style="padding:12px;border-right:1px solid var(--border);background:${c.gl>=0?"color-mix(in srgb, var(--gain) 10%, var(--panel))":"color-mix(in srgb, var(--loss) 10%, var(--panel))"}">
+          <div class="money ${glCls}" style="font-size:18px;font-weight:700">${c.gl>=0?"+":""}${fmt(c.gl)}</div>
+        </div>
+        <div style="padding:12px;background:${c.gl>=0?"color-mix(in srgb, var(--gain) 10%, var(--panel))":"color-mix(in srgb, var(--loss) 10%, var(--panel))"}">
+          <div class="${glCls}" style="font-size:18px;font-weight:700">${c.gl>=0?"+":""}${pct(c.glPct)}</div>
+        </div>
+      </div>
+      <!-- Row 2 header -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;background:var(--panel-2);border-top:1px solid var(--border)">
+        <div style="padding:10px 12px;font-size:11px;font-weight:600;color:var(--muted);border-right:1px solid var(--border)">Self</div>
+        <div style="padding:10px 12px;font-size:11px;font-weight:600;color:var(--muted);border-right:1px solid var(--border)">CMI Contribution</div>
+        <div style="padding:10px 12px;font-size:11px;font-weight:600;color:var(--muted);border-right:1px solid var(--border)">Contribution P/L</div>
+        <div style="padding:10px 12px;font-size:11px;font-weight:600;color:var(--muted)">% P/L</div>
+      </div>
+      <!-- Row 2 values -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;border-top:1px solid var(--border)">
+        <div style="padding:12px;border-right:1px solid var(--border)">
+          <div class="money" style="font-size:18px;font-weight:700">${fmt(c.you)}</div>
+        </div>
+        <div style="padding:12px;border-right:1px solid var(--border)">
+          <div class="money gain" style="font-size:18px;font-weight:700">${fmt(c.employer)}</div>
+        </div>
+        <div style="padding:12px;border-right:1px solid var(--border);background:${c.contribGl>=0?"color-mix(in srgb, var(--gain) 10%, var(--panel))":"color-mix(in srgb, var(--loss) 10%, var(--panel))"}">
+          <div class="money ${cGlCls}" style="font-size:18px;font-weight:700">${c.contribGl>=0?"+":""}${fmt(c.contribGl)}</div>
+          <div class="sub" style="margin-top:3px">Value vs your $ only</div>
+        </div>
+        <div style="padding:12px;background:${c.contribGl>=0?"color-mix(in srgb, var(--gain) 10%, var(--panel))":"color-mix(in srgb, var(--loss) 10%, var(--panel))"}">
+          <div class="${cGlCls}" style="font-size:18px;font-weight:700">${c.contribGl>=0?"+":""}${pct(c.contribGlPct)}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Yearly breakdown -->
+    <div class="card">
+      <strong>Contributions by Year</strong>
+      <table style="margin-top:8px">
+        <thead><tr><th>Year</th><th>Your $</th><th>Employer $</th><th>Total</th></tr></thead>
+        <tbody>
+        ${c.years.map(y=>`<tr>
+          <td><strong>${y.year}</strong></td>
+          <td class="money">${fmt(y.self)}</td>
+          <td class="money gain">${fmt(y.employer)}</td>
+          <td class="money">${fmt(y.self+y.employer)}</td>
+        </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pending -->
+    <div class="card"><strong>Pending contributions</strong>
+      ${pend.length?pend.map((p,i)=>`<div class="card" style="margin-top:8px">
+        <div>${p.date} · ${fmt(p.amount)} self contribution</div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn good" data-confirmhsa="${i}">Confirm</button>
+          <button class="btn gray" data-skiphsa="${i}">Skip</button>
+        </div>
+      </div>`).join(""):'<div class="sub">No pending entries today.</div>'}
+    </div>
+
+    <!-- Contribution history — Edit + Delete, no lock -->
+    <div class="card">
+      <div class="row"><strong>Contribution history</strong><button class="btn" data-open="addHsaModal">Add Contribution</button></div>
+      <table><thead><tr><th>Date</th><th>Amount</th><th>Type</th><th>Note</th><th></th></tr></thead><tbody>
+      ${[...c.rows].sort((a,b)=>d(b.date)-d(a.date)).map(r=>`<tr>
+        <td>${r.date}</td>
+        <td class="money ${r.type==="employer"?"gain":""}">${fmt(r.amount)}</td>
+        <td>${r.type==="self"?"Self":"<span class=\"gain\">Employer</span>"}</td>
+        <td class="sub">${r.note||""}</td>
+        <td style="white-space:nowrap">
+          <button class="btn ghost" style="padding:3px 8px;font-size:11px" data-edithsa="${r.id}">Edit</button>
+          <button class="btn ghost" style="padding:3px 8px;font-size:11px;color:var(--loss)" data-delhsa="${r.id}">Del</button>
+        </td>
+      </tr>`).join("")}
+      </tbody></table>
+    </div>
+  </div>`;
+}
+
+const FACTOR_MAP = {
+  "VGT":"US Large Cap","QQQ":"US Large Cap","QQQM":"US Large Cap","VOO":"US Large Cap","CMI":"US Large Cap",
+  "SPMO":"Momentum","AVUV":"US Small Cap Value","AVDV":"International Small Cap Value","VWO":"Emerging Markets","AVEE":"Emerging Markets","IAU":"Gold","GLD":"Gold","GDLC":"Crypto","IBIT":"Crypto"
+};
+
+async function refreshRobinhoodPrices(){
+  if(typeof navigator!=="undefined"&&navigator.onLine===false){ toast("No internet connection"); return; }
+  robinhoodPriceRefreshLoading=true;
+  doRender();
+  let anyFail=false;
+  const holdings=S.robinhood.holdings||[];
+  try{
+    if(holdings.length){
+      const results=await Promise.all(holdings.map(async (h)=>{
+        const sym=String(h.ticker||"").trim();
+        if(!sym) return {ok:false};
+        const url=`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&range=1d`;
+        try{
+          const res=await fetch(url,{method:"GET",mode:"cors",credentials:"omit",cache:"no-store",headers:{Accept:"application/json"}});
+          if(!res.ok) throw new Error("http");
+          const data=await res.json();
+          if(data?.chart?.error) throw new Error("api");
+          const p=data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+          if(typeof p!=="number"||!Number.isFinite(p)) throw new Error("bad");
+          return {ok:true,id:h.id,price:p};
+        }catch(_){ return {ok:false}; }
+      }));
+      for(const r of results){
+        if(!r.ok){ anyFail=true; continue; }
+        const ho=S.robinhood.holdings.find(x=>x.id===r.id);
+        if(ho) ho.current_price=Number(r.price);
+      }
+    }
+  }catch(_){ anyFail=true; }
+  finally{ robinhoodPriceRefreshLoading=false; saveState(); }
+  const ts=new Date().toLocaleTimeString();
+  if(anyFail) toast("Some prices could not be updated — update manually");
+  else toast(`Prices updated · ${ts}`);
+}
+
+function renderRobinhood(){
+  const r=computeRobinhood(); const worst=r.worst&&r.worst.p>30?r.worst:null;
+  const exposure={};
+  r.holdings.forEach(h=>{ const k=FACTOR_MAP[h.ticker]||"US Large Cap"; exposure[k]=(exposure[k]||0)+h.value; });
+  const totalVal=r.value||1;
+  return `<div class="section">
+    <div class="metric-grid">
+      <div class="card metric"><h4>Invested</h4><div class="v money">${fmt(r.invested)}</div></div>
+      <div class="card metric"><h4>Value</h4><div class="v money">${fmt(r.value)}</div></div>
+      <div class="card metric"><h4>Gain/Loss</h4><div class="v money ${r.gl>=0?'gain':'loss'}">${fmt(r.gl)}</div><div class="sub ${r.gl>=0?'gain':'loss'}">${r.glPct>=0?"+":""}${pct(r.glPct)}</div></div>
+      <div class="card metric"><h4>Holdings</h4><div class="v mono">${r.count}</div></div>
+    </div>
+    ${worst?`<div class="card warn">⚠️ ${worst.ticker} is ${worst.p.toFixed(1)}% of your Robinhood portfolio. Consider rebalancing.</div>`:""}
+    <div class="card gold row"><div>💰 ${fmt(S.robinhood.cash)} · 3.25% APY · Deploy at S&P 500 -20%</div><button class="btn ghost" data-open="cashModal">✏️</button></div>
+    <div class="card"><div class="row"><strong>Holdings</strong><div class="row" style="margin-left:auto;gap:8px"><button type="button" class="btn ghost" id="refreshRobinhoodPrices" ${robinhoodPriceRefreshLoading?"disabled aria-busy=\"true\"":""}>${robinhoodPriceRefreshLoading?`<span class="rh-spin" aria-hidden="true"></span>Updating…`:"Refresh Prices"}</button><button class="btn" data-open="addTradeModal">Add Trade</button></div></div>
+      <table><thead><tr><th>Ticker</th><th>Shares</th><th>Avg Cost</th><th>Price ${tip("Tap any price to update it manually")}</th><th>Value</th><th>G/L $</th><th>G/L %</th></tr></thead><tbody>
+      ${r.holdings.map(h=>`<tr class="click" data-expand="${h.id}"><td class="ticker">${h.ticker}</td><td class="mono">${h.shares.toFixed(2)}</td><td class="money">${fmt(h.avg)}</td><td><button class="btn ghost" data-openprice="${h.id}">${fmt(h.current_price)}</button></td><td class="money">${fmt(h.value)}</td><td class="${h.gl>=0?'gain':'loss'} money">${fmt(h.gl)}</td><td class="${h.gl>=0?'gain':'loss'}">${pct(h.glPct,2)}</td></tr>
+      <tr id="trades-${h.id}" class="hidden"><td colspan="7">${h.trades.map(t=>`<div class="sub">${t.date} · ${t.qty} @ ${fmt(t.price)} · invested ${fmt(t.amount)}</div>`).join("")}<button class="btn ghost" data-delhold="${h.id}" style="margin-top:6px">Delete Position</button></td></tr>`).join("")}
+      </tbody></table>
+    </div>
+    <div class="card factors"><strong>Factor Exposure ${tip("Based on predefined ETF factor mappings aligned with your target strategy")}</strong>
+      ${Object.entries(exposure).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div class="frow"><span>${k}</span><div class="bar"><i style="width:${(v/totalVal*100).toFixed(1)}%"></i></div><span class="mono">${(v/totalVal*100).toFixed(0)}%</span></div>`).join("")}
+    </div>
+  </div>`;
+}
+
+function renderDebt(){
+  const d0=computeDebt();
+  const carPct=(1-d0.car.balance/d0.car.original_balance)*100;
+  const stuMonthsLeft=d0.stuSim.months;
+  const stuMoDisp=d0.stuSim.hopeless?"—":String(stuMonthsLeft);
+  const stuPctRaw=d0.stuSim.hopeless?0:((d0.student.total_months-Math.min(stuMonthsLeft,d0.student.total_months))/d0.student.total_months)*100;
+  const stuPct=Math.min(100,Math.max(0,stuPctRaw));
+  const carMoDisp=d0.carSim.hopeless?"—":String(d0.carSim.months);
+  const carIntDisp=d0.carSim.hopeless?"—":fmt(d0.carSim.totalInterestRemaining,0);
+  const stuIntDisp=d0.stuSim.hopeless?"—":fmt(d0.stuSim.totalInterestRemaining,0);
+  const nc=d0.nextCar, ns=d0.nextStu;
+  const carPayEta=payoffEtaLabel(d0.carSim.months,d0.carSim.hopeless);
+  const stuPayEta=payoffEtaLabel(d0.stuSim.months,d0.stuSim.hopeless);
+  const longIsCar=d0.carSim.months>=d0.stuSim.months;
+  const longSim=longIsCar?d0.carSim:d0.stuSim;
+  const longEta=payoffEtaLabel(longSim.months,longSim.hopeless);
+  return `<div class="section">
+    <div class="metric-grid">
+      <div class="card metric"><h4>Total Debt</h4><div class="v money loss">${fmt(d0.total)}</div></div>
+      <div class="card metric"><h4>Monthly Payments</h4><div class="v money">${fmt(d0.monthly)}</div></div>
+      <div class="card metric"><h4>Annual Interest Cost</h4><div class="v money">${fmt(d0.annualInterest,0)}</div></div>
+      <div class="card metric"><h4>Longest Payoff ETA</h4><div class="v mono">${d0.longest} mo · ${longEta}</div></div>
+    </div>
+    <div class="card warn"><strong>Upcoming payments</strong><div class="sub">Car: ${d0.car.payment_day}th — ${fmt(d0.car.payment)} · Student: ${d0.student.payment_day}th — ${fmt(d0.student.payment)}</div></div>
+    <div class="card">
+      <strong>Payoff Projection</strong>
+      <div class="sub" style="margin-top:4px">Remaining balance by month from today (dashed blue line = car paid off)</div>
+      <div class="charts" style="margin-top:10px;height:280px"><canvas id="debtPayoffChart"></canvas></div>
+    </div>
+    <div class="card">
+      <strong>${d0.car.name}</strong><div class="sub">${d0.car.institution}</div>
+      <div class="sub">balance ${fmt(d0.car.balance)} | rate ${pct(d0.car.rate,2)} | payment ${fmt(d0.car.payment)}/mo | ~${carMoDisp} mo to payoff</div>
+      <div class="bar" style="margin:8px 0"><i style="width:${carPct}%;background:var(--loss)"></i></div>
+      <div class="sub">Next: ${fmt(nc.interest)} interest · ${fmt(nc.principal)} principal · Payoff ~${carPayEta} · Interest remaining ~${carIntDisp}</div>
+      <div class="row" style="margin-top:8px"><button class="btn" data-open="extraPaymentModal" data-loan="car">Extra Payment</button><button class="btn ghost" data-open="editPaymentModal" data-loan="car">Edit Payment Made</button><button class="btn gray" data-open="missedPaymentModal" data-loan="car">Log Missed Payment</button></div>
+    </div>
+    <div class="card">
+      <strong>${d0.student.name}</strong><div class="sub">${d0.student.institution}</div>
+      <div class="sub">principal ${fmt(d0.student.balance)} | accrued ${fmt(d0.student.accrued_interest)} | total owed ${fmt(d0.stuOwed)} | rate ${pct(d0.student.rate,3)} | ${fmt(d0.student.payment)}/mo | ~${stuMoDisp} mo to payoff</div>
+      <div class="card" style="margin:8px 0;background:color-mix(in srgb, var(--gain) 14%, var(--panel))">Overpaying ~$35/mo vs avg $560–$570 — saves ~2 months and ~$1,200 in interest</div>
+      <div class="bar"><i style="width:${stuPct}%;background:var(--gain)"></i></div>
+      <div class="sub">Next: ${fmt(ns.interest)} interest · ${fmt(ns.principal)} principal · Payoff ~${stuPayEta} · Interest remaining ~${stuIntDisp}</div>
+      <div class="row" style="margin-top:8px"><button class="btn" data-open="extraPaymentModal" data-loan="student">Extra Payment</button><button class="btn ghost" data-open="editPaymentModal" data-loan="student">Edit Payment Made</button><button class="btn gray" data-open="missedPaymentModal" data-loan="student">Log Missed Payment</button></div>
+    </div>
+    <div class="card"><strong>Payment history</strong><table><thead><tr><th>Date</th><th>Loan</th><th>Amount</th><th>Principal</th><th>Interest</th><th>Balance After</th></tr></thead><tbody>
+      ${[...S.debt.payment_history].sort((a,b)=>d(b.date)-d(a.date)).map(r=>`<tr><td>${r.date}</td><td>${r.loan}</td><td>${fmt(r.amount)}</td><td>${fmt(r.principal||0)}</td><td>${fmt(r.interest||0)}</td><td>${typeof r.balance_after==="number"?fmt(r.balance_after):"-"} ${r.missed?"MISSED":""}</td></tr>`).join("")}
+    </tbody></table></div>
+  </div>`;
+}
+
+function projectSeries(){
+  const p=S.settings.proj; const currentAge=29, years=36, months=years*12;
+  let val=Number(p.portfolio), mContrib=Number(p.monthly);
+  const annual=Number(p.return_pct)/100, infl=Number(p.inflation)/100, cg=Number(p.contrib_growth)/100;
+  const byAge=[];
+  for(let m=1;m<=months;m++){
+    val = val*(1+annual/12)+mContrib;
+    if(m%12===0){ mContrib *= (1+cg); byAge.push({age:currentAge+m/12,nominal:val,real:val/Math.pow(1+infl,m/12)}); }
+  }
+  return byAge;
+}
+function milestoneAge(target){
+  const p=S.settings.proj; let val=Number(p.portfolio), mContrib=Number(p.monthly), age=29, ym=0;
+  const annual=p.return_pct/100, cg=p.contrib_growth/100;
+  while(val<target && ym<900){ val=val*(1+annual/12)+mContrib; ym++; if(ym%12===0){mContrib*=(1+cg); age++;} }
+  return {age,year:new Date().getFullYear()+(age-29)};
+}
+function renderFuture(){
+  const arr=projectSeries(); const p=S.settings.proj;
+  const tblAges=[35,40,45,50,55,60,65];
+  const milestones=[100000,250000,500000,1000000,5000000];
+  return `<div class="section">
+    <div class="card">
+      <strong>Projection inputs</strong>
+      <div class="two" style="margin-top:8px">
+        ${[
+          ["Current portfolio value","portfolio",fmt(p.portfolio)],
+          ["Monthly investment amount","monthly",fmt(p.monthly)],
+          ["Annual return %","return_pct",pct(p.return_pct)],
+          ["Inflation %","inflation",pct(p.inflation)],
+          ["Contribution growth %","contrib_growth",pct(p.contrib_growth)],
+          ["Retirement age","retire_age",String(p.retire_age)]
+        ].map(x=>`<div class="card click" data-editproj="${x[1]}"><div class="sub">${x[0]}</div><div>${x[2]}</div></div>`).join("")}
+      </div>
+    </div>
+    <div class="card"><strong>Milestones ${tip("Based on your current contribution rate and expected return. Nominal values.")}</strong>
+      ${milestones.map((m,i)=>{const r=milestoneAge(m); return `<div class="row" style="margin-top:7px"><span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:hsl(${i*60} 80% 60%)"></span> ${fmt(m,0)}</span><span>Age ${r.age} · ${r.year}</span></div>`}).join("")}
+    </div>
+    <div class="card"><div class="charts"><canvas id="futureLine"></canvas></div></div>
+    <div class="card"><strong>Projected values</strong><table><thead><tr><th>Age</th><th>Nominal</th><th>Real</th></tr></thead><tbody>
+      ${tblAges.map(a=>{ const row=arr.find(x=>x.age===a)||arr[arr.length-1]; return `<tr><td>${a}</td><td>${fmt(row.nominal,0)}</td><td>${fmt(row.real,0)}</td></tr>`; }).join("")}
+    </tbody></table></div>
+  </div>`;
+}
+
+function renderSettings(){
+  return `<div class="section settings-grid">
+    <div class="section">
+      <div class="card"><strong>Profile</strong><div class="row" style="margin-top:8px"><div>${S.profile.name}</div><button class="btn ghost" data-set="name">Edit</button></div>
+        <div class="row" style="margin-top:8px"><span>Light mode</span><div class="toggle ${S.settings.theme==="light"?"on":""}" id="themeToggle2" role="button" tabindex="0" aria-label="Toggle light or dark theme"><i></i></div></div>
+      </div>
+      <div class="card"><strong>Salary & 401k</strong>
+        <div class="sub">Current Salary: ${fmt(S.settings.salary,0)}</div>
+        <div style="margin-top:8px"><label class="sub">Effective date</label><input type="date" id="salaryEffectiveInline" value="${S.settings.salary_date}"></div>
+        <div class="sub" style="margin-top:8px">401k %: ${S.settings.k401_pct} · CMI Match: 3.5% · Paychecks: 1st &amp; 15th</div>
+        <div class="row" style="margin-top:8px"><button class="btn ghost" data-set="salary">Edit Salary</button><button class="btn ghost" data-set="k401_pct">Edit 401k %</button></div>
+      </div>
+      <div class="card"><strong>HSA Contributions</strong>
+        <div class="sub" style="margin-bottom:10px">Configure your annual HSA contributions. These drive the pending entry amounts on the HSA tab.</div>
+        <table style="font-size:13px;margin-bottom:10px">
+          <thead><tr><th>Year</th><th>Your Annual $</th><th>Per Paycheck</th><th>Employer Annual $</th><th></th></tr></thead>
+          <tbody>
+          ${(S.settings.hsa_years||[]).slice().sort((a,b)=>b.year-a.year).map(y=>`<tr>
+            <td><strong>${y.year}</strong></td>
+            <td class="money">${fmt(y.self_annual)}</td>
+            <td class="money sub">${fmt(y.self_annual/24)} × 24</td>
+            <td class="money gain">${fmt(y.employer_annual)}</td>
+            <td><button class="btn ghost" style="padding:3px 8px;font-size:11px" data-edithsayear="${y.year}">Edit</button>
+                <button class="btn ghost" style="padding:3px 8px;font-size:11px;color:var(--loss)" data-delhsayear="${y.year}">Del</button></td>
+          </tr>`).join("")}
+          </tbody>
+        </table>
+        <button class="btn" data-open="addHsaYearModal" style="width:100%">+ Add Year</button>
+      </div>
+      <div class="card"><strong>Goal</strong><div class="sub">${fmt(S.settings.goal,0)}</div><button class="btn ghost" data-set="goal">Edit Goal</button></div>
+    </div>
+    <div class="section">
+      <div class="card"><strong>Target Strategy</strong><div class="sub" style="line-height:2">AVUV 25% · AVDV 18% · QQQM 18% · SPMO 12% · IAU 10% · VWO 7% · GDLC 5% · VOO 5%</div></div>
+      <div class="card"><strong>Salary History</strong>${S.settings.salary_history.map(h=>`<div class="sub">${h.date}: ${fmt(h.salary,0)}</div>`).join("")}</div>
+      <div class="card"><strong>Data</strong><div class="row" style="margin-top:8px"><button class="btn" id="exportBtn">Export JSON</button><button class="btn ghost" id="importBtn">Import JSON</button></div><button class="btn gray" id="clearBtn" style="margin-top:8px;width:100%">Clear All Data</button></div>
+    </div>
+  </div>`;
+}
+
+function modalShell(id,title,body){
+  return `<div class="modal-wrap" id="${id}"><div class="modal"><div class="row"><h3>${title}</h3><button class="btn ghost" data-close="${id}">✕</button></div>${body}</div></div>`;
+}
+function buildModals(){
+  const host=document.getElementById("modalHost");
+  host.innerHTML=[
+    modalShell("addTradeModal","Add Trade",`<div class="f">
+      <div class="sub">Tap a shortcut to paste it — you can always edit the text freely.</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">${["AVUV","AVDV","QQQM","SPMO","IAU","VWO","GDLC","VOO"].map(t=>`<button type="button" class="btn ghost" data-chip="${t}">${t}</button>`).join("")}</div>
+      <div class="two"><div><label>Ticker (any stock or ETF)</label><input id="tTicker" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="e.g. AAPL, TSLA, NVDA, QQQ"></div><div><label>Date</label><input id="tDate" type="date"></div></div>
+      <div class="two"><div><label>Invested $</label><input id="tAmt" type="number" step="0.01" placeholder="0.00"></div><div><label>Shares/Qty</label><input id="tQty" type="number" step="0.0001" placeholder="0.00"></div></div>
+      <div><label>Price per share</label><input id="tPrice" type="number" step="0.01" placeholder="0.00"></div>
+      <button class="btn" id="saveTrade">Save Trade</button>
+    </div>`),
+    modalShell("priceModal","Update Price",`<div class="f"><label>Ticker</label><input id="priceTicker" readonly><label>New Price</label><input id="priceVal" type="number" step="0.01"><button class="btn" id="savePrice">Save</button></div>`),
+    modalShell("cashModal","Update Cash Reserve",`<div class="f"><label>Cash Reserve Balance</label><input id="cashVal" type="number" step="0.01"><button class="btn" id="saveCash">Save</button></div>`),
+    modalShell("k401ValueModal","Update 401k Current Value",`<div class="f"><label>Current Account Value</label><input id="k401Val" type="number" step="0.01"><button class="btn" id="saveK401Val">Save</button></div>`),
+    modalShell("add401kModal","Add 401k Entry",`<div class="f"><div class="two"><div><label>Date</label><input id="kDate" type="date"></div><div><label>Your Contribution</label><input id="kYou" type="number" step="0.01"></div></div><div class="two"><div><label>CMI Contribution</label><input id="kCmi" type="number" step="0.01"></div><div><label>Note</label><input id="kNote" placeholder="optional"></div></div><button class="btn" id="saveKEntry">Save</button></div>`),
+    modalShell("edit401kModal","Edit 401k Entry",`<div class="f"><div class="two"><div><label>Date</label><input id="editKDate" type="date"></div><div><label>Your Contribution</label><input id="editKYou" type="number" step="0.01"></div></div><div class="two"><div><label>CMI Contribution</label><input id="editKCmi" type="number" step="0.01"></div><div><label>Note</label><input id="editKNote" placeholder="optional"></div></div><div class="sub" id="editKSalaryNote">Salary used will be recalculated from salary history based on the date.</div><input type="hidden" id="editKId"><button class="btn" id="saveEdit401k">Save</button></div>`),
+    modalShell("hsaCashModal","Update HSA Cash Account Balance",`<div class="f"><label>HSA cash account balance (the non-invested cash in your HSA)</label><input id="hsaCashVal" type="number" step="0.01" placeholder="0.00"><div class="sub">This is the uninvested cash sitting in your HSA account — separate from your Charles Schwab brokerage value. Both are added together for total HSA Account Value.</div><button class="btn" id="saveHsaCash">Save</button></div>`),
+    modalShell("hsaSchwabModal","Update Charles Schwab Brokerage Value",`<div class="f"><label>Charles Schwab account value (invested)</label><input id="hsaSchwabVal" type="number" step="0.01" placeholder="0.00"><div class="sub">This logs a new entry in your Schwab value history chart. HSA Account Value = this + HSA cash.</div><button class="btn" id="saveHsaSchwab">Save</button></div>`),
+    modalShell("editHsaEntryModal","Edit Contribution",`<div class="f"><div class="two"><div><label>Date</label><input id="editHDate" type="date"></div><div><label>Amount</label><input id="editHAmt" type="number" step="0.01"></div></div><div class="two"><div><label>Type</label><select id="editHType"><option value="self">Self</option><option value="employer">Employer</option></select></div><div><label>Note</label><input id="editHNote" placeholder="optional"></div></div><input type="hidden" id="editHId"><button class="btn" id="saveEditHsa">Save</button></div>`),
+    modalShell("addHsaModal","Add HSA Contribution",`<div class="f"><div class="two"><div><label>Date</label><input id="hDate" type="date"></div><div><label>Amount</label><input id="hAmt" type="number" step="0.01" placeholder="0.00"></div></div><div class="two"><div><label>Type</label><select id="hType"><option value="self">Self (Payroll)</option><option value="employer">Employer</option></select></div><div><label>Note</label><input id="hNote" placeholder="e.g. Annual employer, bonus"></div></div><div class="sub">Employer contributions are shown in green and tracked separately.</div><button class="btn" id="saveHEntry">Save</button></div>`),
+    modalShell("addHsaYearModal","HSA Year Configuration",`<div class="f">
+      <div class="sub">Set your annual HSA contribution amounts for a year. Per-paycheck = your annual ÷ 24. Employer contribution is added as one lump sum on Jan 15.</div>
+      <div class="two"><div><label>Year</label><input id="hsaYearNum" type="number" placeholder="2026" min="2020" max="2040"></div><div><label>Your Annual Contribution $</label><input id="hsaYearSelf" type="number" step="0.01" placeholder="3792.00"></div></div>
+      <div><label>Employer Annual Contribution $</label><input id="hsaYearEmp" type="number" step="0.01" placeholder="600.00"></div>
+      <div class="sub" id="hsaYearPerPaycheck">Per paycheck: —</div>
+      <input type="hidden" id="hsaYearEditing">
+      <button class="btn" id="saveHsaYear">Save Year</button>
+    </div>`),
+    modalShell("snapshotModal","Log Portfolio Snapshot",`<div class="f"><label>Date</label><input id="snapDate" type="date"><label>Portfolio Value</label><input id="snapVal" type="number" step="0.01"><button class="btn" id="saveSnap">Save</button></div>`),
+    modalShell("extraPaymentModal","Loan Extra Payment",`<div class="f"><label>Loan</label><input id="loanTarget" readonly><label>Date</label><input id="loanDate" type="date"><label>Extra Payment Amount</label><input id="loanAmt" type="number" step="0.01"><label>Note</label><input id="loanNote" placeholder="optional"><button class="btn" id="saveExtraPayment">Save</button></div>`),
+    modalShell("editPaymentModal","Edit Most Recent Payment",`<div class="f"><label>Loan</label><input id="editLoanTarget" readonly><label>Payment Date</label><input id="editPayDate" type="date"><label>Payment Amount</label><input id="editPayAmt" type="number" step="0.01"><button class="btn" id="saveEditPayment">Save</button></div>`),
+    modalShell("missedPaymentModal","Log Missed Payment",`<div class="f"><label>Loan</label><input id="missLoanTarget" readonly><label>Date</label><input id="missDate" type="date"><label>Note</label><input id="missNote" placeholder="optional"><button class="btn" id="saveMissed">Save</button></div>`),
+    modalShell("editSettingModal","Edit Setting",`<div class="f"><label>Setting</label><input id="setKey" readonly><div id="setValWrap"><label>Value</label><input id="setVal"></div><div id="setSalaryDateWrap" class="hidden"><label>Effective date</label><input id="setSalaryEffective" type="date"></div><button class="btn" id="saveSetting">Save</button></div>`),
+    modalShell("clearModal","Confirm Clear Data",`<div class="f"><div class="sub">Type CONFIRM to wipe all data and reset to defaults.</div><input id="confirmWord" placeholder="Type CONFIRM"><button class="btn gray" id="doClear">Clear All Data</button></div>`)
+  ].join("");
+}
+function openModal(id){ document.getElementById(id)?.classList.add("show"); }
+function closeModal(id){ document.getElementById(id)?.classList.remove("show"); }
+function closeAllModals(){ [...document.querySelectorAll(".modal-wrap")].forEach(m=>m.classList.remove("show")); }
+
+function doRender(){
+  switchTheme();
+  navHtml();
+  document.getElementById("title").innerHTML=`<strong>${EMOJI[TAB]} ${TAB}</strong> <span class="sub">· ${S.profile.name}</span>`;
+  const content=document.getElementById("content");
+  if(TAB==="Portfolio") content.innerHTML=renderPortfolio();
+  if(TAB==="401k") content.innerHTML=render401k();
+  if(TAB==="HSA") content.innerHTML=renderHSA();
+  if(TAB==="Robinhood") content.innerHTML=renderRobinhood();
+  if(TAB==="Debt") content.innerHTML=renderDebt();
+  if(TAB==="Future") content.innerHTML=renderFuture();
+  if(TAB==="Settings") content.innerHTML=renderSettings();
+  wire();
+  drawCharts();
+}
+
+function drawCharts(){
+  const p=totalPortfolio();
+  if(document.getElementById("portfolioDonut")){
+    makeChart("portfolioDonut",{type:"doughnut",data:{labels:["401k","HSA","Robinhood","Cash reserve"],datasets:[{data:[p.k.value,p.h.totalValue,p.r.value,p.r.cash],backgroundColor:["#3b82f6","#22c55e","#8b5cf6","#6b7280"],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"right",labels:{color:getComputedStyle(document.body).getPropertyValue("--text").trim()}}}}});
+  }
+  if(document.getElementById("nwLine")){
+    makeChart("nwLine",{type:"line",data:{labels:S.snapshots.map(s=>s.date),datasets:[{data:S.snapshots.map(s=>s.value),borderColor:"#6366f1",backgroundColor:"rgba(99,102,241,.15)",fill:true,tension:.25,pointRadius:0}]},options:chartOpts()});
+  }
+  // HSA chart removed
+  if(document.getElementById("futureLine")){
+    const arr=projectSeries();
+    makeChart("futureLine",{type:"line",data:{labels:arr.map(x=>x.age),datasets:[
+      {label:"Nominal",data:arr.map(x=>x.nominal),borderColor:"#6366f1",backgroundColor:"rgba(99,102,241,.08)",fill:true,tension:.2,pointRadius:0},
+      {label:"Real",data:arr.map(x=>x.real),borderColor:"#22c55e",borderDash:[7,5],fill:false,tension:.2,pointRadius:0}
+    ]},options:{...chartOpts(),scales:{...chartOpts().scales,y:{...chartOpts().scales.y,ticks:{color:getComputedStyle(document.body).getPropertyValue("--muted").trim(),callback:(v)=>v>=1e6?`$${(v/1e6).toFixed(1)}M`:`$${Math.round(v/1000)}k`}}}}});
+  }
+  if(document.getElementById("debtPayoffChart")){
+    const css=getComputedStyle(document.body);
+    const txt=css.getPropertyValue("--text").trim();
+    const muted=css.getPropertyValue("--muted").trim();
+    const grid=css.getPropertyValue("--grid").trim();
+    const {carData,stuData,carZeroMonth,maxMonth}=buildPayoffProjectionSeries();
+    makeChart("debtPayoffChart",{
+      type:"line",
+      plugins:[{id:"carPayoffVLine",afterDraw(chart){
+        const m=chart.config.options.carZeroMonth;
+        if(m==null||!Number.isFinite(m)) return;
+        const xScale=chart.scales.x;
+        if(!xScale)return;
+        const {top,bottom,left,right}=chart.chartArea;
+        const px=xScale.getPixelForValue(m);
+        if(!Number.isFinite(px)||px<left-2||px>right+2) return;
+        const ctx=chart.ctx;
+        ctx.save();ctx.strokeStyle="#3b82f6";ctx.globalAlpha=.75;ctx.setLineDash([6,5]);ctx.lineWidth=2;
+        ctx.beginPath();ctx.moveTo(px,top);ctx.lineTo(px,bottom);ctx.stroke();
+        ctx.setLineDash([]);ctx.globalAlpha=1;ctx.font="11px DM Sans, sans-serif";ctx.fillStyle=muted;
+        ctx.textAlign=m<maxMonth/2?"left":"right";
+        const lx=m<maxMonth/2?Math.min(px+6,right-2):Math.max(px-6,left+2);
+        ctx.fillText("Car paid off",lx,top+14);ctx.restore();
+      }}],
+      data:{datasets:[
+        {label:"Car loan",data:carData,borderColor:"#3b82f6",backgroundColor:"rgba(59,130,246,0.06)",borderWidth:2,fill:false,tension:.12,spanGaps:false,pointRadius:0,pointHitRadius:0},
+        {label:"Student loan",data:stuData,borderColor:"#8b5cf6",backgroundColor:"rgba(139,92,246,0.06)",borderWidth:2,fill:false,tension:.12,spanGaps:false,pointRadius:0,pointHitRadius:0}
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,carZeroMonth,interaction:{mode:"index",intersect:false},
+        plugins:{legend:{position:"top",labels:{color:txt}},tooltip:{callbacks:{
+          title:(items)=>{ const x=items[0]?.parsed?.x; if(x==null)return""; const mo=Math.round(x); return mo===0?"Now":(mo%12===0?`${mo/12} yr`:`${mo} mo`); },
+          label:(ctx)=>{ const y=ctx.parsed.y; if(y==null)return`${ctx.dataset.label}: —`; return` ${ctx.dataset.label}: ${fmt(y,0)}`; }
+        }}},
+        scales:{
+          x:{type:"linear",min:0,suggestedMax:maxMonth+0.5,grid:{color:grid},ticks:{color:muted,maxTicksLimit:14,callback(v){ const m=Math.round(Number(v)); if(m===0)return"0"; if(m%12===0)return`${m/12}yr`; if(m%6===0)return`${m}mo`; return""; }}},
+          y:{grid:{color:grid},ticks:{color:muted,maxTicksLimit:10,callback:(val)=>fmt(val,0)}}
+        }
+      }
+    });
+  }
+}
+
+function initIOSStandaloneFixes(){
+  if(iosStandaloneTapInit) return;
+  iosStandaloneTapInit=true;
+  document.body.addEventListener("touchstart",function(){},{passive:true});
+  let themeTouchMs=0, refreshTouchMs=0;
+  function toggleThemeAction(){
+    if(!S||!S.settings) return;
+    S.settings.theme=S.settings.theme==="dark"?"light":"dark";
+    saveState();
+  }
+  document.addEventListener("touchend",function(e){
+    const toggleEl=e.target.closest("#themeToggle, #themeToggle2");
+    if(toggleEl){ e.preventDefault(); themeTouchMs=Date.now(); toggleThemeAction(); return; }
+    const refBtn=e.target.closest("#refreshRobinhoodPrices");
+    if(refBtn){ if(refBtn.disabled||robinhoodPriceRefreshLoading) return; e.preventDefault(); refreshTouchMs=Date.now(); refreshRobinhoodPrices(); }
+  },{passive:false,capture:true});
+  document.addEventListener("click",function(e){
+    const toggleEl=e.target.closest("#themeToggle, #themeToggle2");
+    if(toggleEl){ if(Date.now()-themeTouchMs<450){ e.preventDefault(); e.stopPropagation(); return; } toggleThemeAction(); return; }
+    const refBtn=e.target.closest("#refreshRobinhoodPrices");
+    if(refBtn){ if(refBtn.disabled||robinhoodPriceRefreshLoading) return; if(Date.now()-refreshTouchMs<450){ e.preventDefault(); return; } refreshRobinhoodPrices(); }
+  },{capture:true});
+}
+
+function wire(){
+  const dT=document.getElementById("debtToggle"); if(dT) dT.onclick=()=>{S.settings.show_debt=!S.settings.show_debt; saveState();};
+  document.querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>{TAB=b.dataset.nav; doRender();});
+  document.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>{
+    const id=b.dataset.open; const loan=b.dataset.loan;
+    if(id==="extraPaymentModal"){document.getElementById("loanTarget").value=loan||"";}
+    if(id==="editPaymentModal"){document.getElementById("editLoanTarget").value=loan||"";}
+    if(id==="missedPaymentModal"){document.getElementById("missLoanTarget").value=loan||"";}
+    if(id==="hsaCashModal"){ const h=document.getElementById("hsaCashVal"); if(h) h.value=String(S.hsa.hsa_cash||0); }
+    if(id==="hsaSchwabModal"){ const h=document.getElementById("hsaSchwabVal"); if(h) h.value=String(S.hsa.schwab_value||0); }
+    openModal(id);
+  });
+  document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>closeModal(b.dataset.close));
+  document.querySelectorAll(".modal-wrap").forEach(m=>m.onclick=(e)=>{ if(e.target===m) m.classList.remove("show"); });
+  document.querySelectorAll("[data-confirm401k]").forEach(b=>b.onclick=()=>{ const p=pending401k()[Number(b.dataset.confirm401k)]; if(!p) return; S.k401.contributions.push({id:Date.now(),date:p.date,you:+p.you.toFixed(2),cmi:+p.cmi.toFixed(2),note:"",locked:true,salary_used:p.salary_used}); saveState(); });
+  document.querySelectorAll("[data-skip401k]").forEach(b=>b.onclick=()=>{ toast("Skipped."); b.closest(".card").remove(); });
+  // Edit 401k entry
+  document.querySelectorAll("[data-edit401k]").forEach(b=>b.onclick=()=>{
+    const r=S.k401.contributions.find(x=>x.id==b.dataset.edit401k);
+    if(!r) return;
+    document.getElementById("editKId").value=r.id;
+    document.getElementById("editKDate").value=r.date;
+    document.getElementById("editKYou").value=r.you;
+    document.getElementById("editKCmi").value=r.cmi;
+    document.getElementById("editKNote").value=r.note||"";
+    const sal=getSalaryForDate(r.date);
+    document.getElementById("editKSalaryNote").textContent=`Salary for ${r.date}: ${new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:0}).format(sal)}`;
+    openModal("edit401kModal");
+  });
+  document.querySelectorAll("[data-del401k]").forEach(b=>b.onclick=()=>{
+    if(confirm("Delete this contribution entry?")) {
+      S.k401.contributions=S.k401.contributions.filter(x=>x.id!=b.dataset.del401k);
+      saveState();
+    }
+  });
+  document.querySelectorAll("[data-confirmhsa]").forEach(b=>b.onclick=()=>{
+    const p=pendingHsa()[Number(b.dataset.confirmhsa)]; if(!p) return;
+    S.hsa.contributions.push({id:Date.now(),date:p.date,amount:p.amount,type:"self",note:"",locked:true});
+    saveState();
+  });
+  document.querySelectorAll("[data-skiphsa]").forEach(b=>b.onclick=()=>{ toast("Skipped."); b.closest(".card").remove(); });
+  document.querySelectorAll("[data-lockhsa]").forEach(b=>b.onclick=()=>{ const r=S.hsa.contributions.find(x=>x.id==b.dataset.lockhsa); if(r) r.locked=!r.locked; saveState(); });
+  document.querySelectorAll("[data-delhsa]").forEach(b=>b.onclick=()=>{
+    if(confirm("Delete this contribution entry?")) {
+      S.hsa.contributions=S.hsa.contributions.filter(x=>x.id!=b.dataset.delhsa);
+      saveState();
+    }
+  });
+  // Edit HSA entry
+  document.querySelectorAll("[data-edithsa]").forEach(b=>b.onclick=()=>{
+    const r=S.hsa.contributions.find(x=>x.id==b.dataset.edithsa);
+    if(!r) return;
+    document.getElementById("editHId").value=r.id;
+    document.getElementById("editHDate").value=r.date;
+    document.getElementById("editHAmt").value=r.amount;
+    document.getElementById("editHType").value=r.type;
+    document.getElementById("editHNote").value=r.note||"";
+    openModal("editHsaEntryModal");
+  });
+  document.querySelectorAll("[data-expand]").forEach(r=>r.onclick=()=>document.getElementById(`trades-${r.dataset.expand}`).classList.toggle("hidden"));
+  document.querySelectorAll("[data-openprice]").forEach(b=>b.onclick=(e)=>{ e.stopPropagation(); const h=S.robinhood.holdings.find(x=>x.id==b.dataset.openprice); if(!h) return; document.getElementById("priceTicker").value=h.ticker; document.getElementById("priceVal").value=h.current_price; openModal("priceModal"); });
+  document.querySelectorAll("[data-delhold]").forEach(b=>b.onclick=()=>{ if(confirm("Delete entire position?")) { S.robinhood.holdings=S.robinhood.holdings.filter(h=>h.id!=b.dataset.delhold); saveState(); }});
+  document.querySelectorAll("[data-chip]").forEach(b=>b.onclick=(ev)=>{
+    ev.preventDefault();
+    const inp=document.getElementById("tTicker");
+    if(!inp) return;
+    inp.value=b.dataset.chip||"";
+    inp.focus();
+  });
+  document.querySelectorAll("[data-set]").forEach(b=>b.onclick=()=>{
+    const key=b.dataset.set; document.getElementById("setKey").value=key;
+    document.getElementById("setVal").value=key==="name"?S.profile.name:S.settings[key];
+    const wrap=document.getElementById("setSalaryDateWrap");
+    if(key==="salary"){ wrap.classList.remove("hidden"); document.getElementById("setSalaryEffective").value=S.settings.salary_date||""; }
+    else wrap.classList.add("hidden");
+    openModal("editSettingModal");
+  });
+  document.querySelectorAll("[data-editproj]").forEach(b=>b.onclick=()=>{
+    document.getElementById("setKey").value="proj."+b.dataset.editproj;
+    document.getElementById("setVal").value=S.settings.proj[b.dataset.editproj];
+    document.getElementById("setSalaryDateWrap").classList.add("hidden");
+    openModal("editSettingModal");
+  });
+  const salInline=document.getElementById("salaryEffectiveInline");
+  if(salInline) salInline.onchange=()=>{
+    const newD=salInline.value; if(!newD) return;
+    const oldD=S.settings.salary_date; const cur=S.settings.salary;
+    S.settings.salary_date=newD;
+    const hist=[...S.settings.salary_history];
+    let i=hist.findIndex(h=>h.salary===cur && h.date===oldD);
+    if(i<0){ for(let j=hist.length-1;j>=0;j--) if(hist[j].salary===cur){ i=j; break; } }
+    if(i>=0) hist[i]={...hist[i],date:newD};
+    else hist.push({salary:cur,date:newD});
+    S.settings.salary_history=hist;
+    saveState(); toast("Effective date saved");
+  };
+  if(document.getElementById("exportBtn")) document.getElementById("exportBtn").onclick=exportJSON;
+  if(document.getElementById("importBtn")) document.getElementById("importBtn").onclick=()=>document.getElementById("jsonImportInput").click();
+  if(document.getElementById("clearBtn")) document.getElementById("clearBtn").onclick=()=>openModal("clearModal");
+
+  document.getElementById("jsonImportInput").onchange=(e)=>{ const f=e.target.files[0]; if(!f) return; const fr=new FileReader(); fr.onload=()=>{ try{ S=JSON.parse(fr.result); if(S&&S.hsa){ if(typeof S.hsa.hsa_cash==="undefined") S.hsa.hsa_cash=0; delete S.hsa.hsa_balance; delete S.hsa.hsa_limit; } saveState(); toast("Imported."); }catch(_){ toast("Invalid JSON."); }}; fr.readAsText(f); };
+
+  document.getElementById("saveTrade").onclick=()=>{
+    const ticker=(document.getElementById("tTicker").value||"").toUpperCase().trim();
+    const date=document.getElementById("tDate").value||new Date().toISOString().slice(0,10);
+    let amount=Number(document.getElementById("tAmt").value||0), qty=Number(document.getElementById("tQty").value||0), price=Number(document.getElementById("tPrice").value||0);
+    if(!amount&&qty&&price) amount=+(qty*price).toFixed(2);
+    if(!qty&&amount&&price) qty=+(amount/price).toFixed(4);
+    if(!price&&amount&&qty) price=+(amount/qty).toFixed(2);
+    if(!ticker||!amount||!qty||!price) return toast("Fill ticker and at least two numeric values.");
+    let h=S.robinhood.holdings.find(x=>x.ticker===ticker);
+    if(!h){ h={id:Date.now(),ticker,name:ticker,trades:[],current_price:price}; S.robinhood.holdings.push(h); }
+    h.trades.push({date,amount:+amount.toFixed(2),qty:+qty.toFixed(4),price:+price.toFixed(2)});
+    h.current_price=price;
+    closeAllModals(); saveState(); toast(`Trade added: ${ticker}`);
+  };
+
+  document.getElementById("savePrice").onclick=()=>{
+    const t=document.getElementById("priceTicker").value;
+    const v=Number(document.getElementById("priceVal").value);
+    const h=S.robinhood.holdings.find(x=>x.ticker===t);
+    if(h) h.current_price=v;
+    closeAllModals(); saveState(); toast(`${t} price updated`);
+  };
+
+  document.getElementById("saveCash").onclick=()=>{ S.robinhood.cash=Number(document.getElementById("cashVal").value||0); closeAllModals(); saveState(); toast("Cash reserve updated"); };
+
+  document.getElementById("saveK401Val").onclick=()=>{ S.k401.current_value=Number(document.getElementById("k401Val").value||0); closeAllModals(); saveState(); toast("401k value updated"); };
+
+  document.getElementById("saveKEntry").onclick=()=>{
+    const date=document.getElementById("kDate").value;
+    const you=Number(document.getElementById("kYou").value||0);
+    const cmi=Number(document.getElementById("kCmi").value||0);
+    if(!date) return toast("Enter a date");
+    S.k401.contributions.push({id:Date.now(),date,you,cmi,note:document.getElementById("kNote").value||"",locked:false,salary_used:getSalaryForDate(date)});
+    closeAllModals(); saveState(); toast("Entry added");
+  };
+  document.getElementById("saveEdit401k").onclick=()=>{
+    const id=Number(document.getElementById("editKId").value);
+    const r=S.k401.contributions.find(x=>x.id===id);
+    if(!r) return toast("Entry not found");
+    const newDate=document.getElementById("editKDate").value||r.date;
+    r.date=newDate;
+    r.you=Number(document.getElementById("editKYou").value||r.you);
+    r.cmi=Number(document.getElementById("editKCmi").value||r.cmi);
+    r.note=document.getElementById("editKNote").value||"";
+    // Recalculate salary_used from salary history based on new date
+    r.salary_used=getSalaryForDate(newDate);
+    closeAllModals(); saveState(); toast("Entry updated");
+  };
+
+  // HSA Balance edit (total contributed — stored independently)
+  document.getElementById("saveHsaCash").onclick=()=>{
+    const v=Number(document.getElementById("hsaCashVal").value||0);
+    if(!Number.isFinite(v)||v<0) return toast("Enter a valid amount");
+    S.hsa.hsa_cash=v;
+    closeAllModals(); saveState(); toast("HSA cash balance updated");
+  };
+
+  // HSA Schwab value edit
+  document.getElementById("saveHsaSchwab").onclick=()=>{
+    const v=Number(document.getElementById("hsaSchwabVal").value||0);
+    if(!Number.isFinite(v)||v<0) return toast("Enter a valid amount");
+    S.hsa.schwab_value=v;
+    S.hsa.schwab_history.push({date:new Date().toISOString().slice(0,10),value:v});
+    closeAllModals(); saveState(); toast("Schwab value updated");
+  };
+  document.getElementById("saveEditHsa").onclick=()=>{
+    const id=Number(document.getElementById("editHId").value);
+    const r=S.hsa.contributions.find(x=>x.id===id);
+    if(!r) return toast("Entry not found");
+    r.date=document.getElementById("editHDate").value||r.date;
+    r.amount=Number(document.getElementById("editHAmt").value||r.amount);
+    r.type=document.getElementById("editHType").value;
+    r.note=document.getElementById("editHNote").value||"";
+    closeAllModals(); saveState(); toast("Entry updated");
+  };
+
+  // HSA year per-paycheck preview
+  const hsaSelfInp=document.getElementById("hsaYearSelf");
+  if(hsaSelfInp) hsaSelfInp.oninput=()=>{
+    const v=Number(hsaSelfInp.value||0);
+    const el=document.getElementById("hsaYearPerPaycheck");
+    if(el) el.textContent=v>0?`Per paycheck: $${(v/24).toFixed(2)} × 24 paychecks`:"Per paycheck: —";
+  };
+
+  // Save HSA year
+  document.getElementById("saveHsaYear").onclick=()=>{
+    const yr=Number(document.getElementById("hsaYearNum").value);
+    const self=Number(document.getElementById("hsaYearSelf").value||0);
+    const emp=Number(document.getElementById("hsaYearEmp").value||0);
+    if(!yr||yr<2020||yr>2040) return toast("Enter a valid year");
+    if(self<=0) return toast("Enter your annual contribution");
+    if(!S.settings.hsa_years) S.settings.hsa_years=[];
+    const existing=S.settings.hsa_years.findIndex(y=>y.year===yr);
+    if(existing>=0) S.settings.hsa_years[existing]={year:yr,self_annual:self,employer_annual:emp};
+    else S.settings.hsa_years.push({year:yr,self_annual:self,employer_annual:emp});
+    closeAllModals(); saveState(); toast(`HSA ${yr} saved — $${(self/24).toFixed(2)}/paycheck`);
+  };
+
+  // Edit HSA year — open modal pre-filled
+  document.querySelectorAll("[data-edithsayear]").forEach(b=>b.onclick=()=>{
+    const yr=Number(b.dataset.edithsayear);
+    const cfg=(S.settings.hsa_years||[]).find(y=>y.year===yr);
+    if(!cfg) return;
+    document.getElementById("hsaYearNum").value=yr;
+    document.getElementById("hsaYearSelf").value=cfg.self_annual;
+    document.getElementById("hsaYearEmp").value=cfg.employer_annual;
+    document.getElementById("hsaYearEditing").value=yr;
+    const el=document.getElementById("hsaYearPerPaycheck");
+    if(el) el.textContent=`Per paycheck: $${(cfg.self_annual/24).toFixed(2)} × 24 paychecks`;
+    openModal("addHsaYearModal");
+  });
+
+  // Delete HSA year
+  document.querySelectorAll("[data-delhsayear]").forEach(b=>b.onclick=()=>{
+    const yr=Number(b.dataset.delhsayear);
+    if(confirm(`Remove HSA configuration for ${yr}?`)){
+      S.settings.hsa_years=(S.settings.hsa_years||[]).filter(y=>y.year!==yr);
+      saveState(); toast(`${yr} removed`);
+    }
+  });
+
+  document.getElementById("saveHEntry").onclick=()=>{
+    const date=document.getElementById("hDate").value;
+    const amount=Number(document.getElementById("hAmt").value||0);
+    const type=document.getElementById("hType").value;
+    if(!date||!amount) return toast("Enter date and amount");
+    S.hsa.contributions.push({id:Date.now(),date,amount,type,note:document.getElementById("hNote").value||"",locked:false});
+    closeAllModals(); saveState(); toast("HSA contribution added");
+  };
+
+  document.getElementById("saveSnap").onclick=()=>{
+    const date=document.getElementById("snapDate").value||new Date().toISOString().slice(0,10);
+    const value=Number(document.getElementById("snapVal").value||totalPortfolio().value);
+    S.snapshots.push({date,value});
+    closeAllModals(); saveState(); toast("Snapshot logged");
+  };
+
+  document.getElementById("saveExtraPayment").onclick=()=>{
+    const loan=document.getElementById("loanTarget").value;
+    const amt=Number(document.getElementById("loanAmt").value||0);
+    const date=document.getElementById("loanDate").value||new Date().toISOString().slice(0,10);
+    if(!amt||amt<=0) return toast("Enter a valid amount");
+    const ref=S.debt[loan];
+    const balBefore=loan==="student"?studentTotalOwed(ref):Number(ref.balance);
+    const split=splitPaymentOnBalance(balBefore,ref.rate,amt);
+    if(loan==="car"){ ref.balance=Math.max(0,split.newBalance); }
+    else{ const red=+(balBefore-split.newBalance).toFixed(2); if(red>0.005) applyStudentPrincipalReduction(ref,red); }
+    const after=loan==="student"?studentTotalOwed(ref):ref.balance;
+    S.debt.payment_history.push({date,loan,amount:amt,principal:split.principal,interest:split.interest,balance_after:after,note:document.getElementById("loanNote").value||""});
+    closeAllModals(); saveState(); toast("Extra payment logged");
+  };
+
+  document.getElementById("saveEditPayment").onclick=()=>{
+    const loan=document.getElementById("editLoanTarget").value;
+    const row=[...S.debt.payment_history].sort((a,b)=>d(b.date)-d(a.date)).find(x=>x.loan===loan&&!x.missed);
+    if(!row) return toast("No payment found to edit");
+    row.date=document.getElementById("editPayDate").value||row.date;
+    const newAmt=Number(document.getElementById("editPayAmt").value);
+    if(newAmt>0) row.amount=newAmt;
+    const bb=balanceBeforeHistoricalPayment(loan,row.date);
+    const split=splitPaymentOnBalance(bb,S.debt[loan].rate,row.amount);
+    row.interest=split.interest; row.principal=split.principal; row.balance_after=split.newBalance;
+    closeAllModals(); saveState(); toast("Payment updated");
+  };
+
+  document.getElementById("saveMissed").onclick=()=>{
+    S.debt.payment_history.push({date:document.getElementById("missDate").value||new Date().toISOString().slice(0,10),loan:document.getElementById("missLoanTarget").value,amount:0,principal:0,interest:0,balance_after:"-",missed:true,note:document.getElementById("missNote").value||""});
+    closeAllModals(); saveState(); toast("Missed payment logged");
+  };
+
+  document.getElementById("saveSetting").onclick=()=>{
+    const key=document.getElementById("setKey").value, v=document.getElementById("setVal").value;
+    if(key==="name"){ S.profile.name=v; }
+    else if(key.startsWith("proj.")){ S.settings.proj[key.split(".")[1]]=Number(v); }
+    else if(key==="salary"){
+      const nv=Number(v);
+      const eff=(document.getElementById("setSalaryEffective").value||"").trim();
+      if(!eff) return toast("Choose an effective date");
+      if(!Number.isFinite(nv)||nv<=0) return toast("Enter a valid salary");
+      S.settings.salary=nv; S.settings.salary_date=eff;
+      S.settings.salary_history.push({salary:nv,date:eff});
+    }else{ S.settings[key]=isNaN(Number(v))?v:Number(v); }
+    closeAllModals(); saveState(); toast("Setting saved");
+  };
+
+  document.getElementById("doClear").onclick=()=>{
+    if((document.getElementById("confirmWord").value||"").trim()==="CONFIRM"){
+      localStorage.removeItem(LS_KEY);
+      S=seedState();
+      saveState();
+      closeAllModals();
+      toast("Data reset to defaults.");
+    } else { toast("Type CONFIRM to clear"); }
+  };
+}
+
+function exportJSON(){
+  const stamp=new Date().toISOString().slice(0,10);
+  const blob=new Blob([JSON.stringify(S,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob); a.download=`neel-portfolio-${stamp}.json`; a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// Init
+buildModals();
+loadState();
+initIOSStandaloneFixes();
+switchTheme();
+doRender();
+</script>
+</body>
+</html>
