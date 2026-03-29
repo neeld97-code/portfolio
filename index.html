@@ -12,7 +12,7 @@ To update: edit in Cursor, re-drag to Netlify. Same URL, instant update. */
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
-  <title>Neel Portfolio Tracker</title>
+  <title>Neel Portfolio Tracker v29Mar</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
@@ -57,7 +57,7 @@ To update: edit in Cursor, re-drag to Netlify. Same URL, instant update. */
     .toggle i{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:white;transition:.2s;pointer-events:none}
     .toggle.on{background:var(--accent)} .toggle.on i{left:23px}
     .toggle:active{opacity:.92}
-    .bottom-nav{position:fixed;left:0;right:0;bottom:0;background:var(--panel);border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(7,1fr);z-index:8}
+    .bottom-nav{position:fixed;left:0;right:0;bottom:0;background:var(--panel);border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(8,1fr);z-index:8}
     .bottom-nav button{border:0;background:transparent;color:var(--muted);padding:8px 2px;font-size:11px;cursor:pointer}
     .bottom-nav button.active{color:var(--text)}
     .bottom-nav .ico{display:block;font-size:18px}
@@ -126,8 +126,8 @@ const LS_KEY = "neel_portfolio_v1";
 let S = null;
 let TAB = "Portfolio";
 const CHARTS = {};
-const TABS = ["Portfolio","401k","HSA","Robinhood","Debt","Future","Settings"];
-const EMOJI = {Portfolio:"\ud83d\udcc8","401k":"\ud83c\udfe6",HSA:"\ud83e\ude7a",Robinhood:"\ud83d\udcb5",Debt:"\ud83e\uddfe",Future:"\ud83d\udd2e",Settings:"\u2699\ufe0f"};
+const TABS = ["Portfolio","401k","HSA","Robinhood","Trades","Debt","Future","Settings"];
+const EMOJI = {Portfolio:"\ud83d\udcc8","401k":"\ud83c\udfe6",HSA:"\ud83e\ude7a",Robinhood:"\ud83d\udcb5",Trades:"\ud83d\uddd2\ufe0f",Debt:"\ud83e\uddfe",Future:"\ud83d\udd2e",Settings:"\u2699\ufe0f"};
 let robinhoodPriceRefreshLoading=false;
 let iosStandaloneTapInit=false;
 
@@ -917,27 +917,131 @@ async function refreshRobinhoodPrices(){
 }
 
 function renderRobinhood(){
-  const r=computeRobinhood(); const worst=r.worst&&r.worst.p>30?r.worst:null;
+  const r=computeRobinhood();
+  const worst=r.worst&&r.worst.p>30?r.worst:null;
   const exposure={};
   r.holdings.forEach(h=>{ const k=FACTOR_MAP[h.ticker]||"US Large Cap"; exposure[k]=(exposure[k]||0)+h.value; });
   const totalVal=r.value||1;
   return `<div class="section">
+    <!-- Summary -->
     <div class="metric-grid">
-      <div class="card metric"><h4>Invested</h4><div class="v money">${fmt(r.invested)}</div></div>
-      <div class="card metric"><h4>Value</h4><div class="v money">${fmt(r.value)}</div></div>
+      <div class="card metric"><h4>Invested</h4><div class="v money">${fmt(r.invested)}</div><div class="sub">from trades</div></div>
+      <div class="card metric"><h4>Value</h4><div class="v money">${fmt(r.value)}</div><div class="sub">live prices</div></div>
       <div class="card metric"><h4>Gain/Loss</h4><div class="v money ${r.gl>=0?'gain':'loss'}">${fmt(r.gl)}</div><div class="sub ${r.gl>=0?'gain':'loss'}">${r.glPct>=0?"+":""}${pct(r.glPct)}</div></div>
       <div class="card metric"><h4>Holdings</h4><div class="v mono">${r.count}</div></div>
     </div>
-    ${worst?`<div class="card warn">⚠️ ${worst.ticker} is ${worst.p.toFixed(1)}% of your Robinhood portfolio. Consider rebalancing.</div>`:""}
-    <div class="card gold row"><div>💰 ${fmt(S.robinhood.cash)} · 3.25% APY · Deploy at S&P 500 -20%</div><button class="btn ghost" data-open="cashModal">✏️</button></div>
-    <div class="card"><div class="row"><strong>Holdings</strong><div class="row" style="margin-left:auto;gap:8px"><button type="button" class="btn ghost" id="refreshRobinhoodPrices" ${robinhoodPriceRefreshLoading?"disabled aria-busy=\"true\"":""}>${robinhoodPriceRefreshLoading?`<span class="rh-spin" aria-hidden="true"></span>Updating…`:"Refresh Prices"}</button><button class="btn" data-open="addTradeModal">Add Trade</button></div></div>
-      <table><thead><tr><th>Ticker</th><th>Shares</th><th>Avg Cost</th><th>Price ${tip("Tap any price to update it manually")}</th><th>Value</th><th>G/L $</th><th>G/L %</th></tr></thead><tbody>
-      ${r.holdings.map(h=>`<tr class="click" data-expand="${h.id}"><td class="ticker">${h.ticker}</td><td class="mono">${h.shares.toFixed(2)}</td><td class="money">${fmt(h.avg)}</td><td><button class="btn ghost" data-openprice="${h.id}">${fmt(h.current_price)}</button></td><td class="money">${fmt(h.value)}</td><td class="${h.gl>=0?'gain':'loss'} money">${fmt(h.gl)}</td><td class="${h.gl>=0?'gain':'loss'}">${pct(h.glPct,2)}</td></tr>
-      <tr id="trades-${h.id}" class="hidden"><td colspan="7">${h.trades.map(t=>`<div class="sub">${t.date} · ${t.qty} @ ${fmt(t.price)} · invested ${fmt(t.amount)}</div>`).join("")}<button class="btn ghost" data-delhold="${h.id}" style="margin-top:6px">Delete Position</button></td></tr>`).join("")}
-      </tbody></table>
+
+    ${worst?`<div class="card warn">⚠️ ${worst.ticker} is ${worst.p.toFixed(1)}% of your portfolio. Consider rebalancing.</div>`:""}
+
+    <!-- Cash reserve -->
+    <div class="card gold row">
+      <div>💰 <strong>${fmt(S.robinhood.cash)}</strong> · 3.25% APY · Deploy at S&P 500 -20%</div>
+      <button class="btn ghost" data-open="cashModal">✏️</button>
     </div>
-    <div class="card factors"><strong>Factor Exposure ${tip("Based on predefined ETF factor mappings aligned with your target strategy")}</strong>
-      ${Object.entries(exposure).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div class="frow"><span>${k}</span><div class="bar"><i style="width:${(v/totalVal*100).toFixed(1)}%"></i></div><span class="mono">${(v/totalVal*100).toFixed(0)}%</span></div>`).join("")}
+
+    <!-- Holdings table -->
+    <div class="card">
+      <div class="row" style="margin-bottom:12px">
+        <strong>Holdings</strong>
+        <div class="row" style="gap:8px;margin-left:auto">
+          <button type="button" class="btn ghost" id="refreshRobinhoodPrices" ${robinhoodPriceRefreshLoading?'disabled':''}>
+            ${robinhoodPriceRefreshLoading?'<span class="rh-spin"></span>Updating…':'🔄 Refresh Prices'}
+          </button>
+          <button class="btn" onclick="TAB='Trades';doRender()">+ Add Trade</button>
+        </div>
+      </div>
+      <div class="sub" style="margin-bottom:8px">Prices update via Refresh button only. All other values auto-calculate from your trades.</div>
+      <table>
+        <thead><tr>
+          <th>Ticker</th><th>Shares</th><th>Avg Cost</th>
+          <th>Price ${tip("Tap to edit manually · or use Refresh Prices button")}</th>
+          <th>Value</th><th>G/L $</th><th>G/L %</th>
+        </tr></thead>
+        <tbody>
+        ${r.holdings.map(h=>`<tr>
+          <td class="ticker">${h.ticker}</td>
+          <td class="mono">${h.shares.toFixed(4)}</td>
+          <td class="money">${fmt(h.avg)}</td>
+          <td><button class="btn ghost" style="font-family:'DM Mono',monospace" data-openprice="${h.id}">${fmt(h.current_price)}</button></td>
+          <td class="money">${fmt(h.value)}</td>
+          <td class="${h.gl>=0?'gain':'loss'} money">${h.gl>=0?'+':''}${fmt(h.gl)}</td>
+          <td class="${h.gl>=0?'gain':'loss'}">${h.gl>=0?'+':''}${pct(h.glPct,2)}</td>
+        </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Factor exposure -->
+    <div class="card factors">
+      <strong>Factor Exposure ${tip("Based on predefined ETF factor mappings")}</strong>
+      ${Object.entries(exposure).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`
+        <div class="frow">
+          <span>${k}</span>
+          <div class="bar"><i style="width:${(v/totalVal*100).toFixed(1)}%"></i></div>
+          <span class="mono">${(v/totalVal*100).toFixed(0)}%</span>
+        </div>`).join("")}
+    </div>
+  </div>`;
+}
+
+// ── TRADES TAB ────────────────────────────────────────────────────────────────
+function renderTrades(){
+  // Flatten all trades across all holdings, enrich with ticker info
+  const allTrades=[];
+  S.robinhood.holdings.forEach(h=>{
+    h.trades.forEach(t=>{
+      allTrades.push({...t, ticker:h.ticker, holdingId:h.id});
+    });
+  });
+  allTrades.sort((a,b)=>d(b.date)-d(a.date));
+  return `<div class="section">
+    <div class="row" style="margin-bottom:4px">
+      <div>
+        <div style="font-size:13px;color:var(--muted)">All trades auto-calculate shares, avg cost and P/L on the Robinhood tab.</div>
+      </div>
+      <button class="btn" data-open="addTradeModal">+ Add Trade</button>
+    </div>
+
+    <!-- Per-holding summary -->
+    <div class="card">
+      <strong>Holdings Summary</strong>
+      <table style="margin-top:8px">
+        <thead><tr><th>Ticker</th><th>Trades</th><th>Total Shares</th><th>Avg Cost</th><th>Invested</th><th></th></tr></thead>
+        <tbody>
+        ${S.robinhood.holdings.map(h=>{
+          const c=computeHolding(h);
+          return `<tr>
+            <td class="ticker">${h.ticker}</td>
+            <td class="mono">${h.trades.length}</td>
+            <td class="mono">${c.shares.toFixed(4)}</td>
+            <td class="money">${fmt(c.avg)}</td>
+            <td class="money">${fmt(c.cost)}</td>
+            <td><button class="btn ghost" style="padding:3px 8px;font-size:11px;color:var(--loss)" data-delhold="${h.id}">Del All</button></td>
+          </tr>`;
+        }).join("")}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Full trade log -->
+    <div class="card">
+      <strong>Trade Log</strong>
+      <table style="margin-top:8px">
+        <thead><tr><th>Date</th><th>Ticker</th><th>Shares</th><th>Price</th><th>Amount</th><th></th></tr></thead>
+        <tbody>
+        ${allTrades.map(t=>`<tr>
+          <td>${t.date}</td>
+          <td class="ticker">${t.ticker}</td>
+          <td class="mono">${Number(t.qty).toFixed(4)}</td>
+          <td class="money">${fmt(t.price)}</td>
+          <td class="money">${fmt(t.amount)}</td>
+          <td style="white-space:nowrap">
+            <button class="btn ghost" style="padding:3px 8px;font-size:11px" data-edittrade-holding="${t.holdingId}" data-edittrade-date="${t.date}" data-edittrade-qty="${t.qty}" data-edittrade-price="${t.price}" data-edittrade-amount="${t.amount}">Edit</button>
+            <button class="btn ghost" style="padding:3px 8px;font-size:11px;color:var(--loss)" data-deltrade-holding="${t.holdingId}" data-deltrade-date="${t.date}" data-deltrade-qty="${t.qty}">Del</button>
+          </td>
+        </tr>`).join("")}
+        </tbody>
+      </table>
     </div>
   </div>`;
 }
@@ -1083,12 +1187,22 @@ function buildModals(){
   const host=document.getElementById("modalHost");
   host.innerHTML=[
     modalShell("addTradeModal","Add Trade",`<div class="f">
-      <div class="sub">Tap a shortcut to paste it — you can always edit the text freely.</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">${["AVUV","AVDV","QQQM","SPMO","IAU","VWO","GDLC","VOO"].map(t=>`<button type="button" class="btn ghost" data-chip="${t}">${t}</button>`).join("")}</div>
-      <div class="two"><div><label>Ticker (any stock or ETF)</label><input id="tTicker" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="e.g. AAPL, TSLA, NVDA, QQQ"></div><div><label>Date</label><input id="tDate" type="date"></div></div>
-      <div class="two"><div><label>Invested $</label><input id="tAmt" type="number" step="0.01" placeholder="0.00"></div><div><label>Shares/Qty</label><input id="tQty" type="number" step="0.0001" placeholder="0.00"></div></div>
-      <div><label>Price per share</label><input id="tPrice" type="number" step="0.01" placeholder="0.00"></div>
+      <div class="sub">Quick tickers:</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px">${["AVUV","AVDV","QQQM","SPMO","IAU","VWO","GDLC","VOO","VGT","QQQ","IBIT","CMI"].map(t=>`<button type="button" class="btn ghost" style="padding:4px 8px;font-size:12px" data-chip="${t}">${t}</button>`).join("")}</div>
+      <div class="two"><div><label>Ticker</label><input id="tTicker" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="AAPL, TSLA, any ticker"></div><div><label>Date</label><input id="tDate" type="date"></div></div>
+      <div class="two"><div><label>Shares / Qty</label><input id="tQty" type="number" step="0.0001" placeholder="0.0000" oninput="calcTradeAmt()"></div><div><label>Price per share</label><input id="tPrice" type="number" step="0.01" placeholder="0.00" oninput="calcTradeAmt()"></div></div>
+      <div><label>Amount invested $ (auto-calculated)</label><input id="tAmt" type="number" step="0.01" placeholder="0.00"></div>
+      <div class="sub" id="tradeCalcNote" style="color:var(--accent)"></div>
       <button class="btn" id="saveTrade">Save Trade</button>
+    </div>`),
+    modalShell("editTradeModal","Edit Trade",`<div class="f">
+      <div class="two"><div><label>Ticker (read-only)</label><input id="editTTicker" readonly></div><div><label>Date</label><input id="editTDate" type="date"></div></div>
+      <div class="two"><div><label>Shares / Qty</label><input id="editTQty" type="number" step="0.0001" oninput="calcEditTradeAmt()"></div><div><label>Price per share</label><input id="editTPrice" type="number" step="0.01" oninput="calcEditTradeAmt()"></div></div>
+      <div><label>Amount invested $</label><input id="editTAmt" type="number" step="0.01"></div>
+      <input type="hidden" id="editTHoldingId">
+      <input type="hidden" id="editTOrigDate">
+      <input type="hidden" id="editTOrigQty">
+      <button class="btn" id="saveEditTrade">Save</button>
     </div>`),
     modalShell("priceModal","Update Price",`<div class="f"><label>Ticker</label><input id="priceTicker" readonly><label>New Price</label><input id="priceVal" type="number" step="0.01"><button class="btn" id="savePrice">Save</button></div>`),
     modalShell("cashModal","Update Cash Reserve",`<div class="f"><label>Cash Reserve Balance</label><input id="cashVal" type="number" step="0.01"><button class="btn" id="saveCash">Save</button></div>`),
@@ -1122,12 +1236,13 @@ function closeAllModals(){ [...document.querySelectorAll(".modal-wrap")].forEach
 function doRender(){
   switchTheme();
   navHtml();
-  document.getElementById("title").innerHTML=`<strong>${EMOJI[TAB]} ${TAB}</strong> <span class="sub">· ${S.profile.name}</span>`;
+  document.getElementById("title").innerHTML=`<strong>${EMOJI[TAB]} ${TAB}</strong> <span class="sub">· ${S.profile.name} · v29Mar</span>`;
   const content=document.getElementById("content");
   if(TAB==="Portfolio") content.innerHTML=renderPortfolio();
   if(TAB==="401k") content.innerHTML=render401k();
   if(TAB==="HSA") content.innerHTML=renderHSA();
   if(TAB==="Robinhood") content.innerHTML=renderRobinhood();
+  if(TAB==="Trades") content.innerHTML=renderTrades();
   if(TAB==="Debt") content.innerHTML=renderDebt();
   if(TAB==="Future") content.innerHTML=renderFuture();
   if(TAB==="Settings") content.innerHTML=renderSettings();
@@ -1217,6 +1332,23 @@ function initIOSStandaloneFixes(){
   },{capture:true});
 }
 
+function calcTradeAmt(){
+  const qty=Number(document.getElementById("tQty")?.value||0);
+  const price=Number(document.getElementById("tPrice")?.value||0);
+  const note=document.getElementById("tradeCalcNote");
+  if(qty&&price){
+    const amt=+(qty*price).toFixed(2);
+    document.getElementById("tAmt").value=amt;
+    if(note) note.textContent=`${qty} shares × $${price} = $${amt}`;
+  } else {
+    if(note) note.textContent="";
+  }
+}
+function calcEditTradeAmt(){
+  const qty=Number(document.getElementById("editTQty")?.value||0);
+  const price=Number(document.getElementById("editTPrice")?.value||0);
+  if(qty&&price) document.getElementById("editTAmt").value=+(qty*price).toFixed(2);
+}
 function wire(){
   const dT=document.getElementById("debtToggle"); if(dT) dT.onclick=()=>{S.settings.show_debt=!S.settings.show_debt; saveState();};
   document.querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>{TAB=b.dataset.nav; doRender();});
@@ -1278,7 +1410,37 @@ function wire(){
   });
   document.querySelectorAll("[data-expand]").forEach(r=>r.onclick=()=>document.getElementById(`trades-${r.dataset.expand}`).classList.toggle("hidden"));
   document.querySelectorAll("[data-openprice]").forEach(b=>b.onclick=(e)=>{ e.stopPropagation(); const h=S.robinhood.holdings.find(x=>x.id==b.dataset.openprice); if(!h) return; document.getElementById("priceTicker").value=h.ticker; document.getElementById("priceVal").value=h.current_price; openModal("priceModal"); });
-  document.querySelectorAll("[data-delhold]").forEach(b=>b.onclick=()=>{ if(confirm("Delete entire position?")) { S.robinhood.holdings=S.robinhood.holdings.filter(h=>h.id!=b.dataset.delhold); saveState(); }});
+  document.querySelectorAll("[data-delhold]").forEach(b=>b.onclick=()=>{ if(confirm("Delete entire position and all its trades?")) { S.robinhood.holdings=S.robinhood.holdings.filter(h=>h.id!=b.dataset.delhold); saveState(); }});
+
+  // Edit trade
+  document.querySelectorAll("[data-edittrade-holding]").forEach(b=>b.onclick=()=>{
+    const hId=Number(b.dataset.edittradeHolding);
+    const h=S.robinhood.holdings.find(x=>x.id===hId);
+    if(!h) return;
+    document.getElementById("editTTicker").value=h.ticker;
+    document.getElementById("editTDate").value=b.dataset.edittradeDate;
+    document.getElementById("editTQty").value=b.dataset.edittradeQty;
+    document.getElementById("editTPrice").value=b.dataset.edittradePrice;
+    document.getElementById("editTAmt").value=b.dataset.edittradeAmount;
+    document.getElementById("editTHoldingId").value=hId;
+    document.getElementById("editTOrigDate").value=b.dataset.edittradeDate;
+    document.getElementById("editTOrigQty").value=b.dataset.edittradeQty;
+    openModal("editTradeModal");
+  });
+
+  // Delete individual trade
+  document.querySelectorAll("[data-deltrade-holding]").forEach(b=>b.onclick=()=>{
+    if(!confirm("Delete this trade?")) return;
+    const hId=Number(b.dataset.deltradeHolding);
+    const origDate=b.dataset.deltradeDate;
+    const origQty=Number(b.dataset.deltradeQty);
+    const h=S.robinhood.holdings.find(x=>x.id===hId);
+    if(!h) return;
+    h.trades=h.trades.filter(t=>!(t.date===origDate&&Math.abs(Number(t.qty)-origQty)<0.00001));
+    // Remove holding entirely if no trades left
+    if(h.trades.length===0) S.robinhood.holdings=S.robinhood.holdings.filter(x=>x.id!==hId);
+    saveState(); toast("Trade deleted");
+  });
   document.querySelectorAll("[data-chip]").forEach(b=>b.onclick=(ev)=>{
     ev.preventDefault();
     const inp=document.getElementById("tTicker");
@@ -1322,16 +1484,35 @@ function wire(){
   document.getElementById("saveTrade").onclick=()=>{
     const ticker=(document.getElementById("tTicker").value||"").toUpperCase().trim();
     const date=document.getElementById("tDate").value||new Date().toISOString().slice(0,10);
-    let amount=Number(document.getElementById("tAmt").value||0), qty=Number(document.getElementById("tQty").value||0), price=Number(document.getElementById("tPrice").value||0);
+    let qty=Number(document.getElementById("tQty").value||0);
+    let price=Number(document.getElementById("tPrice").value||0);
+    let amount=Number(document.getElementById("tAmt").value||0);
     if(!amount&&qty&&price) amount=+(qty*price).toFixed(2);
     if(!qty&&amount&&price) qty=+(amount/price).toFixed(4);
     if(!price&&amount&&qty) price=+(amount/qty).toFixed(2);
-    if(!ticker||!amount||!qty||!price) return toast("Fill ticker and at least two numeric values.");
+    if(!ticker) return toast("Enter a ticker.");
+    if(!qty||!price) return toast("Enter shares and price per share.");
+    if(!amount) amount=+(qty*price).toFixed(2);
     let h=S.robinhood.holdings.find(x=>x.ticker===ticker);
     if(!h){ h={id:Date.now(),ticker,name:ticker,trades:[],current_price:price}; S.robinhood.holdings.push(h); }
     h.trades.push({date,amount:+amount.toFixed(2),qty:+qty.toFixed(4),price:+price.toFixed(2)});
     h.current_price=price;
-    closeAllModals(); saveState(); toast(`Trade added: ${ticker}`);
+    closeAllModals(); saveState(); toast("Trade added: "+ticker);
+  };
+
+  document.getElementById("saveEditTrade").onclick=()=>{
+    const hId=Number(document.getElementById("editTHoldingId").value);
+    const origDate=document.getElementById("editTOrigDate").value;
+    const origQty=Number(document.getElementById("editTOrigQty").value);
+    const h=S.robinhood.holdings.find(x=>x.id===hId);
+    if(!h) return toast("Holding not found");
+    const t=h.trades.find(t=>t.date===origDate&&Math.abs(Number(t.qty)-origQty)<0.00001);
+    if(!t) return toast("Trade not found");
+    t.date=document.getElementById("editTDate").value||t.date;
+    t.qty=+Number(document.getElementById("editTQty").value||t.qty).toFixed(4);
+    t.price=+Number(document.getElementById("editTPrice").value||t.price).toFixed(2);
+    t.amount=+Number(document.getElementById("editTAmt").value||(t.qty*t.price)).toFixed(2);
+    closeAllModals(); saveState(); toast("Trade updated");
   };
 
   document.getElementById("savePrice").onclick=()=>{
