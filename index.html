@@ -12,7 +12,7 @@ To update: edit in Cursor, re-drag to Netlify. Same URL, instant update. */
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
-  <title>Neel Portfolio Tracker v29Mar-d</title>
+  <title>Neel Portfolio Tracker v29Mar-e</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
@@ -254,7 +254,26 @@ function reconcile401kRowsFromHistory(){
 }
 
 function loadState(){
-  try{ S=JSON.parse(localStorage.getItem(LS_KEY))||seedState(); }catch(_){ S=seedState(); }
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      // Wipe old data if it's missing key fields from new structure
+      // or if it has the old single opening entry
+      const hasOldStructure = !parsed.hsa?.hsa_cash
+        || !Array.isArray(parsed.settings?.hsa_years)
+        || (parsed.k401?.contributions?.length===1 && parsed.k401.contributions[0]?.opening===true)
+        || !parsed.robinhood?.holdings?.some(h=>h.ticker==="VGT");
+      if(hasOldStructure){
+        localStorage.removeItem(LS_KEY);
+        S = seedState();
+      } else {
+        S = parsed;
+      }
+    } else {
+      S = seedState();
+    }
+  }catch(_){ S=seedState(); }
   // Migrate: ensure hsa_cash and hsa_years exist
   if(S&&S.hsa){
     if(typeof S.hsa.hsa_cash==="undefined") S.hsa.hsa_cash=0;
@@ -1285,7 +1304,7 @@ function closeAllModals(){ [...document.querySelectorAll(".modal-wrap")].forEach
 function doRender(){
   switchTheme();
   navHtml();
-  document.getElementById("title").innerHTML=`<strong>${EMOJI[TAB]} ${TAB}</strong> <span class="sub">· ${S.profile.name} · v29Mar-d</span>`;
+  document.getElementById("title").innerHTML=`<strong>${EMOJI[TAB]} ${TAB}</strong> <span class="sub">· ${S.profile.name} · v29Mar-e</span>`;
   const content=document.getElementById("content");
   if(TAB==="Portfolio") content.innerHTML=renderPortfolio();
   if(TAB==="401k") content.innerHTML=render401k();
