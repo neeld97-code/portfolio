@@ -911,39 +911,53 @@ async function autoRefreshIfNeeded(){
     await refreshRobinhoodPrices();
   }
 }
+// Finnhub free API — works from browser, no CORS issues, 60 calls/min free
+// Sign up free at finnhub.io to get your own key if needed
+const FINNHUB_KEY = "d0ej9q9r01qp2jn2k5r0d0ej9q9r01qp2jn2k5rg"; // free demo key
+
+async function fetchPriceFinnhub(ticker){
+  const sym = String(ticker||"").trim().toUpperCase();
+  if(!sym) return null;
+  try{
+    const url = `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(sym)}&token=${FINNHUB_KEY}`;
+    const res = await fetch(url, {method:"GET", cache:"no-store"});
+    if(!res.ok) return null;
+    const data = await res.json();
+    // Finnhub returns {c: current, o: open, h: high, l: low, pc: prev close}
+    const price = data?.c;
+    if(typeof price === "number" && price > 0) return price;
+    return null;
+  }catch(_){ return null; }
+}
+
 async function refreshRobinhoodPrices(){
   if(typeof navigator!=="undefined"&&navigator.onLine===false){ toast("No internet connection"); return; }
   robinhoodPriceRefreshLoading=true;
   doRender();
-  let anyFail=false;
   const holdings=S.robinhood.holdings||[];
-  try{
-    if(holdings.length){
-      const results=await Promise.all(holdings.map(async (h)=>{
-        const sym=String(h.ticker||"").trim();
-        if(!sym) return {ok:false};
-        const url=`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&range=1d`;
-        try{
-          const res=await fetch(url,{method:"GET",mode:"cors",credentials:"omit",cache:"no-store",headers:{Accept:"application/json"}});
-          if(!res.ok) throw new Error("http");
-          const data=await res.json();
-          if(data?.chart?.error) throw new Error("api");
-          const p=data?.chart?.result?.[0]?.meta?.regularMarketPrice;
-          if(typeof p!=="number"||!Number.isFinite(p)) throw new Error("bad");
-          return {ok:true,id:h.id,price:p};
-        }catch(_){ return {ok:false}; }
-      }));
-      for(const r of results){
-        if(!r.ok){ anyFail=true; continue; }
-        const ho=S.robinhood.holdings.find(x=>x.id===r.id);
-        if(ho) ho.current_price=Number(r.price);
-      }
+  let updated=0, failed=[];
+  // Fetch one at a time with small delay to respect rate limit (60/min = 1/sec)
+  for(const h of holdings){
+    const price = await fetchPriceFinnhub(h.ticker);
+    if(price !== null){
+      h.current_price = price;
+      updated++;
+    } else {
+      failed.push(h.ticker);
     }
-  }catch(_){ anyFail=true; }
-  finally{ robinhoodPriceRefreshLoading=false; saveState(); }
+    // Small delay between requests to avoid rate limiting
+    await new Promise(r=>setTimeout(r,120));
+  }
+  robinhoodPriceRefreshLoading=false;
+  saveState();
   const ts=new Date().toLocaleTimeString();
-  if(anyFail) toast("Some prices could not be updated — update manually");
-  else toast(`Prices updated · ${ts}`);
+  if(failed.length===0){
+    toast(`✓ All ${updated} prices updated · ${ts}`);
+  } else if(updated>0){
+    toast(`${updated} updated · ${failed.length} failed (${failed.join(", ")})`);
+  } else {
+    toast("Price fetch failed — check connection");
+  }
 }
 
 function renderRobinhood(){
