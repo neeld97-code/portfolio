@@ -11,7 +11,9 @@ To update: edit in Cursor, re-drag to Netlify. Same URL, instant update. */
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>Neel Portfolio Tracker</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -122,6 +124,25 @@ To update: edit in Cursor, re-drag to Netlify. Same URL, instant update. */
 <div id="modalHost"></div>
 
 <script>
+// App version — update this string after every deploy to bust iPhone cache
+const APP_VERSION = "2026-03-29-v4";
+
+// Unregister any stale service workers
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister()));
+}
+
+// Force hard reload once if version changed — fixes iPhone PWA caching
+(function(){
+  const stored=localStorage.getItem("_app_ver");
+  if(stored && stored!==APP_VERSION){
+    localStorage.setItem("_app_ver",APP_VERSION);
+    window.location.reload(true);
+    return;
+  }
+  localStorage.setItem("_app_ver",APP_VERSION);
+})();
+
 const LS_KEY = "neel_portfolio_v1";
 let S = null;
 let TAB = "Portfolio";
