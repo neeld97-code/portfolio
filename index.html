@@ -12,7 +12,7 @@ To update: edit in Cursor, re-drag to Netlify. Same URL, instant update. */
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
-  <title>Neel Portfolio Tracker v29Mar-e</title>
+  <title>Neel Portfolio Tracker v29Mar-f</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
@@ -1243,7 +1243,14 @@ function renderSettings(){
     <div class="section">
       <div class="card"><strong>Target Strategy</strong><div class="sub" style="line-height:2">AVUV 25% · AVDV 18% · QQQM 18% · SPMO 12% · IAU 10% · VWO 7% · GDLC 5% · VOO 5%</div></div>
       <div class="card"><strong>Salary History</strong>${S.settings.salary_history.map(h=>`<div class="sub">${h.date}: ${fmt(h.salary,0)}</div>`).join("")}</div>
-      <div class="card"><strong>Data</strong><div class="row" style="margin-top:8px"><button class="btn" id="exportBtn">Export JSON</button><button class="btn ghost" id="importBtn">Import JSON</button></div><button class="btn gray" id="clearBtn" style="margin-top:8px;width:100%">Clear All Data</button></div>
+      <div class="card"><strong>Data</strong>
+        <div class="row" style="margin-top:8px"><button class="btn" id="exportBtn">Export JSON</button><button class="btn ghost" id="importBtn">Import JSON</button></div>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+          <div class="sub" style="margin-bottom:8px">Type CONFIRM below and tap the button to reset all data to defaults.</div>
+          <input id="inlineClearWord" placeholder="Type CONFIRM" style="margin-bottom:8px">
+          <button class="btn gray" id="inlineClearBtn" style="width:100%">🗑️ Clear All Data</button>
+        </div>
+      </div>
     </div>
   </div>`;
 }
@@ -1304,7 +1311,7 @@ function closeAllModals(){ [...document.querySelectorAll(".modal-wrap")].forEach
 function doRender(){
   switchTheme();
   navHtml();
-  document.getElementById("title").innerHTML=`<strong>${EMOJI[TAB]} ${TAB}</strong> <span class="sub">· ${S.profile.name} · v29Mar-e</span>`;
+  document.getElementById("title").innerHTML=`<strong>${EMOJI[TAB]} ${TAB}</strong> <span class="sub">· ${S.profile.name} · v29Mar-f</span>`;
   const content=document.getElementById("content");
   if(TAB==="Portfolio") content.innerHTML=renderPortfolio();
   if(TAB==="401k") content.innerHTML=render401k();
@@ -1554,6 +1561,19 @@ function wire(){
   if(document.getElementById("exportBtn")) document.getElementById("exportBtn").onclick=exportJSON;
   if(document.getElementById("importBtn")) document.getElementById("importBtn").onclick=()=>document.getElementById("jsonImportInput").click();
   if(document.getElementById("clearBtn")) document.getElementById("clearBtn").onclick=()=>openModal("clearModal");
+  // Inline clear — works on mobile without modal
+  const inlineClearBtn=document.getElementById("inlineClearBtn");
+  if(inlineClearBtn) inlineClearBtn.onclick=()=>{
+    const word=(document.getElementById("inlineClearWord")?.value||"").trim();
+    if(word==="CONFIRM"){
+      localStorage.clear();
+      S=seedState();
+      saveState();
+      toast("✓ Data cleared and reset to defaults");
+    } else {
+      toast("Type CONFIRM in the box above first");
+    }
+  };
 
   document.getElementById("jsonImportInput").onchange=(e)=>{ const f=e.target.files[0]; if(!f) return; const fr=new FileReader(); fr.onload=()=>{ try{ S=JSON.parse(fr.result); if(S&&S.hsa){ if(typeof S.hsa.hsa_cash==="undefined") S.hsa.hsa_cash=0; delete S.hsa.hsa_balance; delete S.hsa.hsa_limit; } saveState(); toast("Imported."); }catch(_){ toast("Invalid JSON."); }}; fr.readAsText(f); };
 
